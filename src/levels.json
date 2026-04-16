@@ -6,6 +6,67 @@
       "name": "Ouverture",
       "layout": [
         [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "silver",
           "silver",
           "silver",
           "silver",
@@ -20,6 +81,7 @@
           "silver"
         ],
         [
+          "blue",
           "blue",
           "blue",
           "blue",
@@ -45,9 +107,11 @@
           "orange",
           "orange",
           "orange",
+          "orange",
           "orange"
         ],
         [
+          "red",
           "red",
           "red",
           "red",
@@ -73,6 +137,7 @@
           "pink",
           "pink",
           "pink",
+          "pink",
           "pink"
         ]
       ]
@@ -82,7 +147,38 @@
       "name": "Mur d'or",
       "layout": [
         [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
           "white",
+          null,
           null,
           null,
           null,
@@ -98,6 +194,7 @@
         [
           "white",
           "orange",
+          null,
           null,
           null,
           null,
@@ -113,6 +210,7 @@
           "white",
           "orange",
           "cyan",
+          null,
           null,
           null,
           null,
@@ -128,6 +226,7 @@
           "orange",
           "cyan",
           "green",
+          null,
           null,
           null,
           null,
@@ -143,6 +242,7 @@
           "cyan",
           "green",
           "red",
+          null,
           null,
           null,
           null,
@@ -158,6 +258,7 @@
           "green",
           "red",
           "blue",
+          null,
           null,
           null,
           null,
@@ -173,6 +274,22 @@
           "red",
           "blue",
           "pink",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "white",
+          "orange",
+          "cyan",
+          "green",
+          "red",
+          "blue",
+          "pink",
+          "yellow",
           null,
           null,
           null,
@@ -188,21 +305,8 @@
           "blue",
           "pink",
           "yellow",
-          null,
-          null,
-          null,
-          null
-        ],
-        [
           "white",
-          "orange",
-          "cyan",
-          "green",
-          "red",
-          "blue",
-          "pink",
-          "yellow",
-          "white",
+          null,
           null,
           null,
           null
@@ -219,6 +323,7 @@
           "white",
           "orange",
           null,
+          null,
           null
         ],
         [
@@ -233,6 +338,7 @@
           "white",
           "orange",
           "cyan",
+          null,
           null
         ],
         [
@@ -247,7 +353,8 @@
           "white",
           "orange",
           "cyan",
-          "green"
+          "green",
+          null
         ],
         [
           "silver",
@@ -261,7 +368,8 @@
           "silver",
           "silver",
           "silver",
-          "silver"
+          "silver",
+          "red"
         ]
       ]
     }

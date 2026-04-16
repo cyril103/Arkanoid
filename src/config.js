@@ -1,29 +1,37 @@
+const BRICK_ROWS_TO_PADDLE = 26;
+const BRICK_ROW_HEIGHT = 21;
+const FRAME_Y = 16;
+const FRAME_TOP_THICKNESS = 22;
+const PADDLE_HEIGHT = 20;
+const PADDLE_BOTTOM_OFFSET = 34;
+const CANVAS_HEIGHT = FRAME_Y + FRAME_TOP_THICKNESS + (BRICK_ROWS_TO_PADDLE * BRICK_ROW_HEIGHT) + PADDLE_HEIGHT + PADDLE_BOTTOM_OFFSET;
+
 export const GAME_CONFIG = Object.freeze({
   canvasWidth: 800,
-  canvasHeight: 544,
+  canvasHeight: CANVAS_HEIGHT,
   lives: {
     initial: 3
   },
   frame: {
     x: 100,
-    y: 16,
+    y: FRAME_Y,
     width: 600,
-    height: 512,
+    height: CANVAS_HEIGHT - (FRAME_Y * 2),
     wallThickness: 22,
-    topThickness: 22
+    topThickness: FRAME_TOP_THICKNESS
   },
   playfield: {
     left: 122,
     right: 678,
-    top: 38,
+    top: FRAME_Y + FRAME_TOP_THICKNESS,
     width: 556
   },
   paddle: {
     baseWidth: 79,
     expandedWidth: 119,
     width: 79,
-    height: 20,
-    bottomOffset: 34,
+    height: PADDLE_HEIGHT,
+    bottomOffset: PADDLE_BOTTOM_OFFSET,
     keyboardSpeed: 620,
     pulseFps: 8,
     explodeFps: 14,
@@ -38,9 +46,9 @@ export const GAME_CONFIG = Object.freeze({
     maxBounceAngle: (70 * Math.PI) / 180
   },
   bricks: {
-    topOffset: 92,
-    sideMargin: 20,
-    rowHeight: 21,
+    topOffset: 32,
+    sideMargin: 0,
+    rowHeight: BRICK_ROW_HEIGHT,
     gap: 0,
     hardHitAnimationFps: 20
   },
@@ -62,7 +70,7 @@ export const GAME_CONFIG = Object.freeze({
     height: 19,
     fallSpeed: 120,
     animationFps: 10,
-    spawnChance: 0.28,
+    spawnChance: 0.15,
     catchDuration: 14,
     laserDuration: 12,
     expandDuration: 14,

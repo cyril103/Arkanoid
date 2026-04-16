@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="24" viewBox="0 0 64 24">
+  <defs>
+    <linearGradient id="hardBrick" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b7ecff"/>
+      <stop offset="100%" stop-color="#3f79c5"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="62" height="22" rx="5" fill="url(#hardBrick)" stroke="#214b7f" stroke-width="2"/>
+  <path d="M14 17L24 7M28 17L38 7M42 17L50 9" stroke="#eaf6ff" stroke-width="2" stroke-linecap="round" opacity="0.75"/>
+</svg>

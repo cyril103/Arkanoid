@@ -1,0 +1,1421 @@
+import { Ball, Brick, Enemy, EnemyExplosion, LaserShot, Paddle, PowerUp } from "./entities.js";
+import {
+  BRICK_LIBRARY,
+  COMMON_BRICK_VARIANTS,
+  ENEMY_LIBRARY,
+  GAME_CONFIG,
+  POWERUP_LIBRARY
+} from "./config.js";
+import { LEVELS } from "./levels.js";
+import { loadSprites } from "./sprites.js";
+import { getResolvedSpriteManifest } from "./spriteHooks.js";
+import { clamp, isCircleCollidingWithRect } from "./utils.js";
+
+export class Game {
+  constructor({ canvas, scoreNode, levelNode, statusNode, livesNode, effectNode, sounds = null }) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d");
+    this.scoreNode = scoreNode;
+    this.levelNode = levelNode;
+    this.statusNode = statusNode;
+    this.livesNode = livesNode;
+    this.effectNode = effectNode;
+    this.sounds = sounds;
+
+    this.paddle = new Paddle();
+    this.balls = [new Ball()];
+    this.levelIndex = 0;
+    this.score = 0;
+    this.lives = GAME_CONFIG.lives.initial;
+    this.bricks = [];
+    this.powerUps = [];
+    this.lasers = [];
+    this.enemies = [];
+    this.enemyExplosions = [];
+    this.enemyDoorAnimations = [];
+    this.statusText = "Chargement...";
+    this.levelCompleteCooldown = 0;
+    this.pendingLevelIndex = null;
+    this.pendingTransitionReason = null;
+    this.elapsed = 0;
+    this.paddleRespawnElapsed = 0;
+    this.laserCooldownRemaining = 0;
+    this.enemySpawnCooldown = getRandomEnemySpawnDelay();
+    this.activeEffects = {
+      catch: 0,
+      expand: 0,
+      laser: 0,
+      slow: 0
+    };
+    this.paddleWidthTransition = null;
+    this.paddleLaserTransitionElapsed = 0;
+    this.paddleDestruction = null;
+  }
+
+  async init() {
+    this.sprites = await loadSprites(getResolvedSpriteManifest());
+    this.loadLevel(0);
+    this.updateHud();
+  }
+
+  loadLevel(index) {
+    this.levelIndex = index;
+    this.bricks = buildBricks(LEVELS[index].layout);
+    this.powerUps = [];
+    this.lasers = [];
+    this.enemies = [];
+    this.enemyExplosions = [];
+    this.enemyDoorAnimations = [];
+    this.enemySpawnCooldown = getRandomEnemySpawnDelay();
+    this.clearTimedEffects();
+    this.resetBallState();
+    this.statusText = "Prêt à lancer";
+    this.levelCompleteCooldown = 0;
+    this.pendingLevelIndex = null;
+    this.pendingTransitionReason = null;
+    this.paddleDestruction = null;
+    this.updateHud();
+  }
+
+  update(dt, input) {
+    if (this.paddleDestruction) {
+      this.updatePaddleDestruction(dt);
+      return;
+    }
+
+    this.elapsed += dt;
+    this.paddleRespawnElapsed += dt;
+    this.laserCooldownRemaining = Math.max(0, this.laserCooldownRemaining - dt);
+    this.updateActiveEffects(dt);
+    this.updatePaddleTransition(dt);
+    this.updateDoorAnimations(dt);
+    this.updateEnemyExplosions(dt);
+    this.updateBrickAnimations(dt);
+    this.paddle.update(dt, input.state);
+    this.syncAttachedBalls();
+    this.updateEffectHud();
+    this.updatePowerUps(dt);
+    this.updateLasers(dt);
+
+    if (this.levelCompleteCooldown > 0) {
+      this.levelCompleteCooldown -= dt;
+      if (this.levelCompleteCooldown <= 0 && this.pendingLevelIndex !== null) {
+        const reason = this.pendingTransitionReason;
+        this.loadLevel(this.pendingLevelIndex);
+        if (reason === "warp") {
+          this.statusText = "Warp réussi";
+          this.updateHud();
+        } else if (reason === "clear" && this.levelIndex === 0) {
+          this.statusText = "Cycle relancé";
+          this.updateHud();
+        }
+      }
+      return;
+    }
+
+    const actionRequested = input.consumeLaunch();
+    if (actionRequested) {
+      if (this.hasStuckBalls()) {
+        this.releaseStuckBalls();
+      } else if (this.activeEffects.laser > 0 && this.laserCooldownRemaining === 0) {
+        this.fireLaserShots();
+      }
+    }
+
+    this.updateEnemies(dt);
+    this.handleEnemyBallCollisions();
+
+    if (this.balls.every((ball) => ball.stuckToPaddle)) {
+      return;
+    }
+
+    for (const ball of this.balls) {
+      if (ball.stuckToPaddle) {
+        continue;
+      }
+
+      ball.move(dt);
+      this.handleWallCollisions(ball);
+      this.handlePaddleCollision(ball);
+      this.handleBrickCollisions(ball);
+    }
+
+    this.handleEnemyBallCollisions();
+
+    this.balls = this.balls.filter(
+      (ball) => ball.stuckToPaddle || ball.y - ball.radius <= GAME_CONFIG.frame.y + GAME_CONFIG.frame.height
+    );
+
+    if (this.balls.length === 0) {
+      this.handleLostBall();
+      return;
+    }
+
+    if (this.areDestructibleBricksCleared()) {
+      this.scheduleLevelTransition(
+        this.levelIndex < LEVELS.length - 1 ? this.levelIndex + 1 : 0,
+        1.2,
+        this.levelIndex < LEVELS.length - 1 ? "Niveau suivant" : "Victoire",
+        "clear"
+      );
+    }
+  }
+
+  hasStuckBalls() {
+    return this.balls.some((ball) => ball.stuckToPaddle);
+  }
+
+  hasMovingBall() {
+    return this.balls.some((ball) => !ball.stuckToPaddle);
+  }
+
+  releaseStuckBalls() {
+    for (const ball of this.balls) {
+      if (!ball.stuckToPaddle) {
+        continue;
+      }
+
+      ball.launch();
+      this.applyCurrentBallSpeed(ball);
+    }
+
+    this.statusText = "En cours";
+    this.updateHud();
+  }
+
+  restartRun(statusText = "Partie relancée") {
+    this.score = 0;
+    this.lives = GAME_CONFIG.lives.initial;
+    this.loadLevel(0);
+    this.statusText = statusText;
+    this.updateHud();
+  }
+
+  clearTimedEffects() {
+    this.activeEffects.catch = 0;
+    this.activeEffects.expand = 0;
+    this.activeEffects.laser = 0;
+    this.activeEffects.slow = 0;
+    this.laserCooldownRemaining = 0;
+    this.paddleWidthTransition = null;
+    this.paddleLaserTransitionElapsed = 0;
+    this.paddleDestruction = null;
+    this.paddle.setWidth(GAME_CONFIG.paddle.baseWidth);
+  }
+
+  resetBallState() {
+    this.paddle = new Paddle();
+    this.syncPaddleWidthWithEffects();
+    const ball = new Ball();
+    ball.attachToPaddle(this.paddle);
+    this.balls = [ball];
+    this.lasers = [];
+    this.paddleRespawnElapsed = 0;
+  }
+
+  handleLostBall() {
+    this.lives -= 1;
+    this.playSound("paddleExplosion");
+    this.paddleDestruction = {
+      elapsed: 0
+    };
+    this.statusText = this.lives > 0 ? "Balle perdue" : "Partie perdue";
+    this.updateHud();
+  }
+
+  updatePaddleDestruction(dt) {
+    if (!this.paddleDestruction) {
+      return;
+    }
+
+    this.paddleDestruction.elapsed += dt;
+
+    if (this.paddleDestruction.elapsed < getAnimationDuration(this.sprites?.paddleExplode)) {
+      return;
+    }
+
+    this.paddleDestruction = null;
+
+    if (this.lives > 0) {
+      this.resetBallState();
+      this.statusText = "Prêt à lancer";
+      this.updateHud();
+      return;
+    }
+
+    this.restartRun("Partie perdue");
+  }
+
+  updateActiveEffects(dt) {
+    if (this.activeEffects.expand > 0) {
+      this.activeEffects.expand = Math.max(0, this.activeEffects.expand - dt);
+      if (this.activeEffects.expand === 0) {
+        this.startPaddleWidthTransition("shrink");
+      }
+    }
+
+    if (this.activeEffects.slow > 0) {
+      this.activeEffects.slow = Math.max(0, this.activeEffects.slow - dt);
+      if (this.activeEffects.slow === 0) {
+        for (const ball of this.balls) {
+          if (!ball.stuckToPaddle) {
+            ball.setSpeed(GAME_CONFIG.ball.launchSpeed);
+          }
+        }
+      }
+    }
+
+    if (this.activeEffects.catch > 0) {
+      this.activeEffects.catch = Math.max(0, this.activeEffects.catch - dt);
+    }
+
+    if (this.activeEffects.laser > 0) {
+      this.activeEffects.laser = Math.max(0, this.activeEffects.laser - dt);
+      const laserTransitionDuration = getAnimationDuration(this.sprites?.paddleLaser);
+      if (this.paddleLaserTransitionElapsed < laserTransitionDuration) {
+        this.paddleLaserTransitionElapsed = Math.min(
+          laserTransitionDuration,
+          this.paddleLaserTransitionElapsed + dt
+        );
+      }
+    } else {
+      this.paddleLaserTransitionElapsed = 0;
+    }
+  }
+
+  updatePaddleTransition(dt) {
+    if (!this.paddleWidthTransition) {
+      return;
+    }
+
+    this.paddleWidthTransition.elapsed += dt;
+
+    if (this.paddleWidthTransition.elapsed >= GAME_CONFIG.paddle.widthTransitionDuration) {
+      const width = this.paddleWidthTransition.mode === "expand"
+        ? GAME_CONFIG.paddle.expandedWidth
+        : GAME_CONFIG.paddle.baseWidth;
+      this.paddle.setWidth(width);
+      this.paddleWidthTransition = null;
+      this.syncAttachedBalls();
+    }
+  }
+
+  updateDoorAnimations(dt) {
+    for (const animation of this.enemyDoorAnimations) {
+      animation.elapsed += dt;
+    }
+
+    const duration = 7 / GAME_CONFIG.warp.doorFps;
+    this.enemyDoorAnimations = this.enemyDoorAnimations.filter((animation) => animation.elapsed < duration);
+  }
+
+  updateEnemyExplosions(dt) {
+    for (const explosion of this.enemyExplosions) {
+      explosion.update(dt);
+    }
+
+    this.enemyExplosions = this.enemyExplosions.filter((explosion) => !explosion.expired);
+  }
+
+  updateBrickAnimations(dt) {
+    for (const brick of this.bricks) {
+      if (brick.destroyed) {
+        continue;
+      }
+
+      brick.update(dt);
+    }
+  }
+
+  startPaddleWidthTransition(mode) {
+    const targetWidth = mode === "expand" ? GAME_CONFIG.paddle.expandedWidth : GAME_CONFIG.paddle.baseWidth;
+    if (this.paddle.width === targetWidth && !this.paddleWidthTransition) {
+      return;
+    }
+
+    this.paddleWidthTransition = {
+      mode,
+      elapsed: 0
+    };
+    this.paddle.setWidth(targetWidth);
+    this.syncAttachedBalls();
+  }
+
+  syncPaddleWidthWithEffects() {
+    const width = this.activeEffects.expand > 0
+      ? GAME_CONFIG.paddle.expandedWidth
+      : GAME_CONFIG.paddle.baseWidth;
+    this.paddle.setWidth(width);
+  }
+
+  syncAttachedBalls() {
+    for (const ball of this.balls) {
+      ball.syncWithPaddle(this.paddle);
+    }
+  }
+
+  applyCurrentBallSpeed(ball) {
+    if (this.activeEffects.slow > 0) {
+      ball.setSpeed(GAME_CONFIG.ball.launchSpeed * GAME_CONFIG.powerUps.slowSpeedFactor);
+    }
+  }
+
+  updatePowerUps(dt) {
+    for (const powerUp of this.powerUps) {
+      if (powerUp.collected || powerUp.expired) {
+        continue;
+      }
+
+      powerUp.update(dt);
+
+      if (isRectColliding(powerUp, this.paddle)) {
+        powerUp.collected = true;
+        this.applyPowerUp(powerUp);
+      }
+    }
+
+    this.powerUps = this.powerUps.filter((powerUp) => !powerUp.collected && !powerUp.expired);
+  }
+
+  updateLasers(dt) {
+    for (const laser of this.lasers) {
+      if (laser.expired) {
+        continue;
+      }
+
+      laser.update(dt);
+      this.handleLaserEnemyCollisions(laser);
+      if (!laser.expired) {
+        this.handleLaserBrickCollisions(laser);
+      }
+    }
+
+    this.lasers = this.lasers.filter((laser) => !laser.expired);
+  }
+
+  updateEnemies(dt) {
+    if (this.hasMovingBall()) {
+      this.enemySpawnCooldown -= dt;
+      if (this.enemySpawnCooldown <= 0 && this.enemies.length < GAME_CONFIG.enemies.maxActive) {
+        this.spawnEnemy();
+        this.enemySpawnCooldown = getRandomEnemySpawnDelay();
+      }
+    }
+
+    for (const enemy of this.enemies) {
+      if (enemy.destroyed) {
+        continue;
+      }
+
+      enemy.update(dt);
+      if (enemy.decisionRemaining <= 0) {
+        this.randomizeEnemyVelocity(enemy, { preferDownward: true });
+      }
+
+      this.moveEnemy(enemy, dt);
+      this.resolveEnemyPaddleCollision(enemy);
+    }
+
+    this.enemies = this.enemies.filter((enemy) => !enemy.destroyed);
+  }
+
+  spawnEnemy() {
+    const definition = pickWeightedDefinition(ENEMY_LIBRARY);
+    if (!definition) {
+      return;
+    }
+
+    const y = GAME_CONFIG.playfield.top + GAME_CONFIG.enemies.spawnYOffset;
+    const enemy = new Enemy({
+      x: GAME_CONFIG.playfield.left + GAME_CONFIG.enemies.spawnInset,
+      y,
+      definition,
+      speed: randomRange(GAME_CONFIG.enemies.speedMin, GAME_CONFIG.enemies.speedMax)
+    });
+
+    this.placeEnemyAtTopDoor(enemy);
+    this.enemies.push(enemy);
+  }
+
+  randomizeEnemyVelocity(enemy, { preferDownward = true, horizontalSign = null } = {}) {
+    let dx = randomRange(-0.9, 0.9);
+    let dy = preferDownward
+      ? randomRange(0.35, 1)
+      : randomRange(-1, 1);
+
+    if (horizontalSign !== null) {
+      dx = Math.abs(dx || 0.25) * horizontalSign;
+    }
+
+    if (Math.abs(dx) < 0.12) {
+      dx = dx < 0 ? -0.22 : 0.22;
+    }
+
+    if (preferDownward && dy < 0.25) {
+      dy = 0.25 + Math.abs(dy);
+    }
+
+    enemy.setVelocity(dx, dy);
+    enemy.decisionRemaining = randomRange(
+      GAME_CONFIG.enemies.decisionDelayMin,
+      GAME_CONFIG.enemies.decisionDelayMax
+    );
+  }
+
+  moveEnemy(enemy, dt) {
+    const nextX = enemy.x + (enemy.dx * dt);
+    if (!this.isEnemyBlocked(nextX, enemy.y, enemy.width, enemy.height)) {
+      enemy.x = nextX;
+    } else {
+      enemy.dx = -enemy.dx;
+      enemy.decisionRemaining = 0.08;
+    }
+
+    const nextY = enemy.y + (enemy.dy * dt);
+    const nextRect = {
+      x: enemy.x,
+      y: nextY,
+      width: enemy.width,
+      height: enemy.height
+    };
+
+    if (this.isRectTouchingPaddle(nextRect)) {
+      enemy.y = nextY;
+      return;
+    }
+
+    if (nextY + enemy.height >= GAME_CONFIG.frame.y + GAME_CONFIG.frame.height) {
+      this.placeEnemyAtTopDoor(enemy);
+      return;
+    }
+
+    if (!this.isEnemyBlocked(enemy.x, nextY, enemy.width, enemy.height)) {
+      enemy.y = nextY;
+    } else {
+      enemy.dy = -enemy.dy;
+      enemy.decisionRemaining = 0.08;
+    }
+  }
+
+  isEnemyBlocked(x, y, width, height) {
+    const rect = { x, y, width, height };
+
+    if (
+      x <= GAME_CONFIG.playfield.left ||
+      x + width >= GAME_CONFIG.playfield.right ||
+      y <= GAME_CONFIG.playfield.top
+    ) {
+      return true;
+    }
+
+    for (const brick of this.bricks) {
+      if (!brick.destroyed && isRectColliding(rect, brick)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  resolveEnemyPaddleCollision(enemy) {
+    if (!this.isRectTouchingPaddle(enemy)) {
+      return;
+    }
+
+    this.destroyEnemy(enemy);
+  }
+
+  isRectTouchingPaddle(rect) {
+    return (
+      rect.x <= this.paddle.x + this.paddle.width &&
+      rect.x + rect.width >= this.paddle.x &&
+      rect.y <= this.paddle.y + this.paddle.height &&
+      rect.y + rect.height >= this.paddle.y
+    );
+  }
+
+  placeEnemyAtTopDoor(enemy, side = Math.random() < 0.5 ? "left" : "right") {
+    enemy.x = side === "left"
+      ? GAME_CONFIG.playfield.left + GAME_CONFIG.enemies.spawnInset
+      : GAME_CONFIG.playfield.right - GAME_CONFIG.enemies.spawnInset - enemy.width;
+    enemy.y = GAME_CONFIG.playfield.top + GAME_CONFIG.enemies.spawnYOffset;
+    enemy.elapsed = 0;
+
+    this.randomizeEnemyVelocity(enemy, {
+      preferDownward: true,
+      horizontalSign: side === "left" ? 1 : -1
+    });
+
+    this.enemyDoorAnimations.push({
+      side,
+      elapsed: 0
+    });
+    this.statusText = "Intrusion ennemie";
+    this.updateHud();
+  }
+
+  handleEnemyBallCollisions() {
+    for (const enemy of this.enemies) {
+      if (enemy.destroyed) {
+        continue;
+      }
+
+      for (const ball of this.balls) {
+        if (ball.stuckToPaddle) {
+          continue;
+        }
+
+        if (!isCircleCollidingWithRect(ball, enemy)) {
+          continue;
+        }
+
+        resolveBallRectResponse(ball, enemy);
+        this.destroyEnemy(enemy);
+        break;
+      }
+    }
+  }
+
+  handleLaserEnemyCollisions(laser) {
+    for (const enemy of this.enemies) {
+      if (enemy.destroyed) {
+        continue;
+      }
+
+      if (!isRectColliding(laser, enemy)) {
+        continue;
+      }
+
+      laser.expired = true;
+      this.destroyEnemy(enemy);
+      break;
+    }
+  }
+
+  destroyEnemy(enemy) {
+    enemy.destroyed = true;
+    this.playSound("enemyExplosion");
+    this.enemyExplosions.push(
+      new EnemyExplosion({
+        x: enemy.x + (enemy.width / 2),
+        y: enemy.y + (enemy.height / 2)
+      })
+    );
+    this.score += GAME_CONFIG.enemies.score;
+    this.statusText = "Ennemi détruit";
+    this.updateHud();
+  }
+
+  applyPowerUp(powerUp) {
+    let shouldOverrideStatus = true;
+
+    switch (powerUp.type) {
+      case "catch":
+        this.activeEffects.catch = GAME_CONFIG.powerUps.catchDuration;
+        break;
+      case "duplicate":
+        this.spawnDuplicateBalls();
+        break;
+      case "expand":
+        this.activeEffects.expand = GAME_CONFIG.powerUps.expandDuration;
+        this.startPaddleWidthTransition("expand");
+        break;
+      case "laser":
+        if (this.activeEffects.laser <= 0) {
+          this.paddleLaserTransitionElapsed = 0;
+        }
+        this.activeEffects.laser = GAME_CONFIG.powerUps.laserDuration;
+        this.laserCooldownRemaining = 0;
+        break;
+      case "life":
+        this.lives += 1;
+        this.playSound("extraLife");
+        break;
+      case "slow":
+        this.activeEffects.slow = GAME_CONFIG.powerUps.slowDuration;
+        for (const ball of this.balls) {
+          if (!ball.stuckToPaddle) {
+            ball.setSpeed(GAME_CONFIG.ball.launchSpeed * GAME_CONFIG.powerUps.slowSpeedFactor);
+          }
+        }
+        break;
+      case "warp":
+        this.activateWarp();
+        shouldOverrideStatus = false;
+        break;
+      default:
+        return;
+    }
+
+    this.score += 50;
+    if (shouldOverrideStatus) {
+      this.statusText = `Bonus: ${powerUp.label}`;
+    }
+    this.updateHud();
+  }
+
+  activateWarp() {
+    const nextLevel = this.levelIndex < LEVELS.length - 1 ? this.levelIndex + 1 : 0;
+    this.scheduleLevelTransition(nextLevel, GAME_CONFIG.warp.transitionDuration, "Warp", "warp");
+  }
+
+  scheduleLevelTransition(nextLevelIndex, duration, statusText, reason) {
+    this.powerUps = [];
+    this.lasers = [];
+    this.enemies = [];
+    this.enemyExplosions = [];
+    this.enemyDoorAnimations = [];
+    this.levelCompleteCooldown = duration;
+    this.pendingLevelIndex = nextLevelIndex;
+    this.pendingTransitionReason = reason;
+    this.statusText = statusText;
+    this.updateHud();
+  }
+
+  spawnDuplicateBalls() {
+    const maxBalls = 3;
+    const availableSlots = maxBalls - this.balls.length;
+    if (availableSlots <= 0 || this.balls.length === 0) {
+      return;
+    }
+
+    const source = this.balls.find((ball) => !ball.stuckToPaddle) ?? this.balls[0];
+    const speed = Math.hypot(source.dx, source.dy) || GAME_CONFIG.ball.launchSpeed;
+    const angles = [-0.42, 0.42];
+
+    for (let index = 0; index < availableSlots; index += 1) {
+      const clone = source.clone();
+
+      if (source.stuckToPaddle) {
+        const offsets = [-18, 18];
+        clone.attachToPaddle(this.paddle, offsets[index] ?? 0);
+      } else {
+        const angle = angles[index] ?? 0.22;
+        const rotated = rotateVector(source.dx, source.dy, angle);
+        clone.dx = rotated.x;
+        clone.dy = rotated.y;
+        clone.setSpeed(speed);
+      }
+
+      this.balls.push(clone);
+    }
+  }
+
+  fireLaserShots() {
+    this.laserCooldownRemaining = GAME_CONFIG.laser.cooldown;
+    this.playSound("shot");
+
+    this.lasers.push(
+      new LaserShot({
+        x: this.paddle.x + 8,
+        y: this.paddle.y - GAME_CONFIG.laser.height
+      }),
+      new LaserShot({
+        x: this.paddle.x + this.paddle.width - GAME_CONFIG.laser.width - 8,
+        y: this.paddle.y - GAME_CONFIG.laser.height
+      })
+    );
+
+    this.statusText = "Tir laser";
+    this.updateHud();
+  }
+
+  maybeSpawnPowerUp(brick) {
+    if (brick.indestructible || Math.random() > GAME_CONFIG.powerUps.spawnChance) {
+      return;
+    }
+
+    const definition = pickWeightedDefinition(POWERUP_LIBRARY);
+    if (!definition) {
+      return;
+    }
+
+    this.powerUps.push(
+      new PowerUp({
+        x: brick.x + ((brick.width - GAME_CONFIG.powerUps.width) / 2),
+        y: brick.y + ((brick.height - GAME_CONFIG.powerUps.height) / 2),
+        definition
+      })
+    );
+  }
+
+  handleWallCollisions(ball) {
+    let collided = false;
+
+    if (ball.x - ball.radius <= GAME_CONFIG.playfield.left) {
+      ball.x = GAME_CONFIG.playfield.left + ball.radius;
+      ball.dx = Math.abs(ball.dx);
+      collided = true;
+    }
+
+    if (ball.x + ball.radius >= GAME_CONFIG.playfield.right) {
+      ball.x = GAME_CONFIG.playfield.right - ball.radius;
+      ball.dx = -Math.abs(ball.dx);
+      collided = true;
+    }
+
+    if (ball.y - ball.radius <= GAME_CONFIG.playfield.top) {
+      ball.y = GAME_CONFIG.playfield.top + ball.radius;
+      ball.dy = Math.abs(ball.dy);
+      collided = true;
+    }
+
+    if (collided) {
+      this.playSound("ballBounce");
+    }
+  }
+
+  handlePaddleCollision(ball) {
+    const paddleRect = {
+      x: this.paddle.x,
+      y: this.paddle.y,
+      width: this.paddle.width,
+      height: this.paddle.height
+    };
+
+    if (!isCircleCollidingWithRect(ball, paddleRect) || ball.dy <= 0) {
+      return;
+    }
+
+    if (this.activeEffects.catch > 0) {
+      this.playSound("paddleBounce");
+      ball.attachToPaddle(this.paddle, ball.x - this.paddle.centerX);
+      this.statusText = "Balle capturée";
+      this.updateHud();
+      return;
+    }
+
+    ball.y = this.paddle.y - ball.radius - 1;
+    const impact = clamp((ball.x - this.paddle.centerX) / (this.paddle.width / 2), -1, 1);
+    const speed = Math.hypot(ball.dx, ball.dy) || GAME_CONFIG.ball.launchSpeed;
+    const angle = impact * GAME_CONFIG.ball.maxBounceAngle;
+
+    ball.dx = speed * Math.sin(angle);
+    ball.dy = -Math.abs(speed * Math.cos(angle));
+    this.playSound("paddleBounce");
+    this.statusText = "En cours";
+    this.updateHud();
+  }
+
+  handleBrickCollisions(ball) {
+    for (const brick of this.bricks) {
+      if (brick.destroyed) {
+        continue;
+      }
+
+      if (!isCircleCollidingWithRect(ball, brick)) {
+        continue;
+      }
+
+      resolveBallRectResponse(ball, brick);
+      this.playSound("brickBounce");
+      this.damageBrick(brick);
+      break;
+    }
+  }
+
+  handleLaserBrickCollisions(laser) {
+    for (const brick of this.bricks) {
+      if (brick.destroyed) {
+        continue;
+      }
+
+      if (!isRectColliding(laser, brick)) {
+        continue;
+      }
+
+      laser.expired = true;
+      this.playSound("brickBounce");
+      this.damageBrick(brick);
+      break;
+    }
+  }
+
+  damageBrick(brick) {
+    const points = brick.hit();
+    const wasDestroyed = brick.destroyed;
+    this.score += points;
+    if (wasDestroyed) {
+      this.maybeSpawnPowerUp(brick);
+    }
+    this.updateHud();
+  }
+
+  areDestructibleBricksCleared() {
+    return this.bricks.every((brick) => brick.indestructible || brick.destroyed);
+  }
+
+  getActiveEffectText() {
+    const labels = [];
+
+    if (this.activeEffects.catch > 0) {
+      labels.push(`Capture ${Math.ceil(this.activeEffects.catch)}s`);
+    }
+
+    if (this.activeEffects.expand > 0) {
+      labels.push(`Extension ${Math.ceil(this.activeEffects.expand)}s`);
+    }
+
+    if (this.activeEffects.laser > 0) {
+      labels.push(`Laser ${Math.ceil(this.activeEffects.laser)}s`);
+    }
+
+    if (this.activeEffects.slow > 0) {
+      labels.push(`Ralenti ${Math.ceil(this.activeEffects.slow)}s`);
+    }
+
+    return labels.join(" | ") || "Aucun";
+  }
+
+  updateHud() {
+    this.scoreNode.textContent = String(this.score);
+    this.levelNode.textContent = `${this.levelIndex + 1} - ${LEVELS[this.levelIndex].name}`;
+    this.statusNode.textContent = this.statusText;
+
+    if (this.livesNode) {
+      this.livesNode.textContent = String(this.lives);
+    }
+
+    if (this.effectNode) {
+      this.effectNode.textContent = this.getActiveEffectText();
+    }
+  }
+
+  updateEffectHud() {
+    if (this.effectNode) {
+      this.effectNode.textContent = this.getActiveEffectText();
+    }
+  }
+
+  playSound(key) {
+    this.sounds?.play(key);
+  }
+
+  render() {
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.renderBackdrop();
+    this.renderBricks();
+    this.renderEnemies();
+    this.renderEnemyExplosions();
+    this.renderPowerUps();
+    this.renderLasers();
+    this.renderPaddle();
+    this.renderBalls();
+    this.renderLevelTitle();
+    this.renderLives();
+  }
+
+  renderBackdrop() {
+    const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+    gradient.addColorStop(0, "#05090f");
+    gradient.addColorStop(1, "#02040b");
+
+    this.ctx.fillStyle = gradient;
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    this.ctx.fillStyle = "#010306";
+    this.ctx.fillRect(
+      GAME_CONFIG.playfield.left,
+      GAME_CONFIG.playfield.top,
+      GAME_CONFIG.playfield.width,
+      GAME_CONFIG.frame.height - GAME_CONFIG.frame.topThickness
+    );
+
+    this.ctx.save();
+    this.ctx.beginPath();
+    this.ctx.rect(
+      GAME_CONFIG.playfield.left,
+      GAME_CONFIG.playfield.top,
+      GAME_CONFIG.playfield.width,
+      GAME_CONFIG.frame.height - GAME_CONFIG.frame.topThickness
+    );
+    this.ctx.clip();
+
+    this.ctx.strokeStyle = "rgba(113, 162, 255, 0.08)";
+    this.ctx.lineWidth = 1;
+
+    for (let x = GAME_CONFIG.playfield.left; x < GAME_CONFIG.playfield.right; x += 32) {
+      this.ctx.beginPath();
+      this.ctx.moveTo(x, GAME_CONFIG.playfield.top);
+      this.ctx.lineTo(x, GAME_CONFIG.frame.y + GAME_CONFIG.frame.height);
+      this.ctx.stroke();
+    }
+
+    for (let y = GAME_CONFIG.playfield.top; y < GAME_CONFIG.frame.y + GAME_CONFIG.frame.height; y += 32) {
+      this.ctx.beginPath();
+      this.ctx.moveTo(GAME_CONFIG.playfield.left, y);
+      this.ctx.lineTo(GAME_CONFIG.playfield.right, y);
+      this.ctx.stroke();
+    }
+
+    this.ctx.restore();
+
+    if (this.sprites?.logo) {
+      this.ctx.save();
+      this.ctx.globalAlpha = 0.18;
+      drawSprite(this.ctx, this.sprites.logo, {
+        x: (this.canvas.width / 2) - 140,
+        y: 24,
+        width: 280,
+        height: 102
+      });
+      this.ctx.restore();
+    }
+
+    drawSprite(this.ctx, this.sprites.frameTop, {
+      x: GAME_CONFIG.playfield.left,
+      y: GAME_CONFIG.frame.y,
+      width: GAME_CONFIG.playfield.width,
+      height: GAME_CONFIG.frame.topThickness
+    }, () => {
+      this.ctx.fillStyle = "#b6bcc7";
+      this.ctx.fillRect(
+        GAME_CONFIG.playfield.left,
+        GAME_CONFIG.frame.y,
+        GAME_CONFIG.playfield.width,
+        GAME_CONFIG.frame.topThickness
+      );
+    });
+
+    if (this.pendingTransitionReason === "warp") {
+      const warpElapsed = GAME_CONFIG.warp.transitionDuration - this.levelCompleteCooldown;
+      drawSprite(this.ctx, this.sprites.doorTopLeft, {
+        x: GAME_CONFIG.playfield.left,
+        y: GAME_CONFIG.frame.y,
+        width: GAME_CONFIG.playfield.width,
+        height: GAME_CONFIG.frame.topThickness
+      }, undefined, warpElapsed, false);
+      drawSprite(this.ctx, this.sprites.doorTopRight, {
+        x: GAME_CONFIG.playfield.left,
+        y: GAME_CONFIG.frame.y,
+        width: GAME_CONFIG.playfield.width,
+        height: GAME_CONFIG.frame.topThickness
+      }, undefined, warpElapsed, false);
+    } else {
+      for (const animation of this.enemyDoorAnimations) {
+        const sprite = animation.side === "left" ? this.sprites.doorTopLeft : this.sprites.doorTopRight;
+        drawSprite(this.ctx, sprite, {
+          x: GAME_CONFIG.playfield.left,
+          y: GAME_CONFIG.frame.y,
+          width: GAME_CONFIG.playfield.width,
+          height: GAME_CONFIG.frame.topThickness
+        }, undefined, animation.elapsed, false);
+      }
+    }
+
+    drawSprite(this.ctx, this.sprites.frameLeft, {
+      x: GAME_CONFIG.frame.x,
+      y: GAME_CONFIG.frame.y,
+      width: GAME_CONFIG.frame.wallThickness,
+      height: GAME_CONFIG.frame.height
+    }, () => {
+      this.ctx.fillStyle = "#a6afbb";
+      this.ctx.fillRect(
+        GAME_CONFIG.frame.x,
+        GAME_CONFIG.frame.y,
+        GAME_CONFIG.frame.wallThickness,
+        GAME_CONFIG.frame.height
+      );
+    });
+
+    drawSprite(this.ctx, this.sprites.frameRight, {
+      x: GAME_CONFIG.frame.x + GAME_CONFIG.frame.width - GAME_CONFIG.frame.wallThickness,
+      y: GAME_CONFIG.frame.y,
+      width: GAME_CONFIG.frame.wallThickness,
+      height: GAME_CONFIG.frame.height
+    }, () => {
+      this.ctx.fillStyle = "#a6afbb";
+      this.ctx.fillRect(
+        GAME_CONFIG.frame.x + GAME_CONFIG.frame.width - GAME_CONFIG.frame.wallThickness,
+        GAME_CONFIG.frame.y,
+        GAME_CONFIG.frame.wallThickness,
+        GAME_CONFIG.frame.height
+      );
+    });
+  }
+
+  renderPaddle() {
+    const { sprite, elapsed, loop, bounds } = this.getPaddleSpriteState();
+
+    drawSprite(this.ctx, sprite, bounds, () => {
+      this.ctx.fillStyle = "#f7d35b";
+      this.ctx.fillRect(this.paddle.x, this.paddle.y, this.paddle.width, this.paddle.height);
+    }, elapsed, loop);
+  }
+
+  renderBalls() {
+    for (const ball of this.balls) {
+      drawSprite(this.ctx, this.sprites.ball, {
+        x: ball.x - ball.radius,
+        y: ball.y - ball.radius,
+        width: ball.radius * 2,
+        height: ball.radius * 2
+      }, () => {
+        this.ctx.fillStyle = "#ffffff";
+        this.ctx.beginPath();
+        this.ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        this.ctx.fill();
+      });
+    }
+  }
+
+  renderBricks() {
+    for (const brick of this.bricks) {
+      if (brick.destroyed) {
+        continue;
+      }
+
+      const sprite = brick.hitAnimationActive
+        ? this.sprites.brickSilverHit
+        : this.sprites[getBrickSpriteKey(brick)];
+
+      drawSprite(this.ctx, sprite, brick, () => {
+        this.ctx.fillStyle = brick.indestructible ? "#e0b84a" : brick.type === "hard" ? "#c8d1de" : "#9cf27a";
+        this.ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+      }, brick.hitAnimationElapsed, false);
+    }
+  }
+
+  renderEnemies() {
+    for (const enemy of this.enemies) {
+      drawSprite(this.ctx, this.sprites[enemy.spriteKey], enemy, () => {
+        this.ctx.fillStyle = "#ff6b6b";
+        this.ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+      }, enemy.elapsed, true);
+    }
+  }
+
+  renderEnemyExplosions() {
+    for (const explosion of this.enemyExplosions) {
+      drawSprite(this.ctx, this.sprites.enemyExplosion, explosion, undefined, explosion.elapsed, false);
+    }
+  }
+
+  renderPowerUps() {
+    for (const powerUp of this.powerUps) {
+      drawSprite(this.ctx, this.sprites[powerUp.spriteKey], powerUp, () => {
+        this.ctx.fillStyle = "#ffffff";
+        this.ctx.fillRect(powerUp.x, powerUp.y, powerUp.width, powerUp.height);
+      }, powerUp.elapsed, true);
+    }
+  }
+
+  renderLasers() {
+    for (const laser of this.lasers) {
+      drawSprite(this.ctx, this.sprites.laserBullet, laser, () => {
+        this.ctx.fillStyle = "#ffd84d";
+        this.ctx.fillRect(laser.x, laser.y, laser.width, laser.height);
+      });
+    }
+  }
+
+  renderLevelTitle() {
+    this.ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
+    this.ctx.font = '600 18px "Trebuchet MS", sans-serif';
+    this.ctx.textAlign = "left";
+    this.ctx.fillText(LEVELS[this.levelIndex].name, GAME_CONFIG.playfield.left + 12, 58);
+
+    if (this.hasStuckBalls()) {
+      this.ctx.textAlign = "center";
+      this.ctx.font = '600 20px "Trebuchet MS", sans-serif';
+      this.ctx.fillText("Cliquez ou appuyez sur Espace pour servir", this.canvas.width / 2, this.canvas.height - 72);
+    }
+  }
+
+  renderLives() {
+    if (!this.sprites?.paddleLife) {
+      return;
+    }
+
+    for (let index = 0; index < this.lives; index += 1) {
+      drawSprite(this.ctx, this.sprites.paddleLife, {
+        x: GAME_CONFIG.playfield.left + 10 + (index * 24),
+        y: this.canvas.height - 24,
+        width: 20,
+        height: 8
+      });
+    }
+  }
+
+  getPaddleSpriteState() {
+    if (this.paddleDestruction) {
+      const explodeImage = getSpriteImage(
+        this.sprites?.paddleExplode,
+        this.paddleDestruction.elapsed,
+        false
+      );
+      const explodeWidth = explodeImage?.width ?? this.sprites?.paddleExplode?.width ?? GAME_CONFIG.paddle.baseWidth;
+      const explodeHeight = explodeImage?.height ?? this.sprites?.paddleExplode?.height ?? GAME_CONFIG.paddle.height;
+      return {
+        sprite: this.sprites.paddleExplode,
+        elapsed: this.paddleDestruction.elapsed,
+        loop: false,
+        bounds: {
+          x: this.paddle.centerX - (explodeWidth / 2),
+          y: this.paddle.y + this.paddle.height - explodeHeight,
+          width: explodeWidth,
+          height: explodeHeight
+        }
+      };
+    }
+
+    if (this.paddleRespawnElapsed < GAME_CONFIG.paddle.materializeDuration) {
+      return {
+        sprite: this.sprites.paddleMaterialize,
+        elapsed: this.paddleRespawnElapsed,
+        loop: false,
+        bounds: {
+          x: this.paddle.x,
+          y: this.paddle.y,
+          width: this.paddle.width,
+          height: this.paddle.height
+        }
+      };
+    }
+
+    if (this.paddleWidthTransition) {
+      return {
+        sprite: this.paddleWidthTransition.mode === "expand"
+          ? this.sprites.paddleWideTransition
+          : this.sprites.paddleShrinkTransition,
+        elapsed: this.paddleWidthTransition.elapsed,
+        loop: false,
+        bounds: {
+          x: this.paddle.x,
+          y: this.paddle.y,
+          width: this.paddle.width,
+          height: this.paddle.height
+        }
+      };
+    }
+
+    if (this.activeEffects.laser > 0) {
+      const laserTransitionDuration = getAnimationDuration(this.sprites.paddleLaser);
+      return {
+        sprite: this.sprites.paddleLaser,
+        elapsed: Math.min(this.paddleLaserTransitionElapsed, laserTransitionDuration),
+        loop: false,
+        bounds: {
+          x: this.paddle.x,
+          y: this.paddle.y,
+          width: this.paddle.width,
+          height: this.paddle.height
+        }
+      };
+    }
+
+    if (this.activeEffects.expand > 0) {
+      return {
+        sprite: this.hasStuckBalls() ? this.sprites.paddleWidePulsate : this.sprites.paddleWide,
+        elapsed: this.elapsed,
+        loop: this.hasStuckBalls(),
+        bounds: {
+          x: this.paddle.x,
+          y: this.paddle.y,
+          width: this.paddle.width,
+          height: this.paddle.height
+        }
+      };
+    }
+
+    if (this.hasStuckBalls()) {
+      return {
+        sprite: this.sprites.paddlePulsate,
+        elapsed: this.elapsed,
+        loop: true,
+        bounds: {
+          x: this.paddle.x,
+          y: this.paddle.y,
+          width: this.paddle.width,
+          height: this.paddle.height
+        }
+      };
+    }
+
+    return {
+      sprite: this.sprites.paddle,
+      elapsed: 0,
+      loop: false,
+      bounds: {
+        x: this.paddle.x,
+        y: this.paddle.y,
+        width: this.paddle.width,
+        height: this.paddle.height
+      }
+    };
+  }
+}
+
+function buildBricks(layout) {
+  const columns = Math.max(...layout.map((row) => row.length));
+  const totalGap = (columns - 1) * GAME_CONFIG.bricks.gap;
+  const usableWidth = GAME_CONFIG.playfield.width - (GAME_CONFIG.bricks.sideMargin * 2) - totalGap;
+  const brickWidth = usableWidth / columns;
+
+  return layout.flatMap((row, rowIndex) =>
+    row.flatMap((value, colIndex) => {
+      const definition = BRICK_LIBRARY[value];
+      if (!definition) {
+        return [];
+      }
+
+      const spriteKey = value === 1
+        ? COMMON_BRICK_VARIANTS[rowIndex % COMMON_BRICK_VARIANTS.length]
+        : definition.spriteKey;
+
+      return [
+        new Brick({
+          x: GAME_CONFIG.playfield.left + GAME_CONFIG.bricks.sideMargin + colIndex * (brickWidth + GAME_CONFIG.bricks.gap),
+          y: GAME_CONFIG.bricks.topOffset + rowIndex * (GAME_CONFIG.bricks.rowHeight + GAME_CONFIG.bricks.gap),
+          width: brickWidth,
+          height: GAME_CONFIG.bricks.rowHeight,
+          definition: {
+            ...definition,
+            spriteKey
+          }
+        })
+      ];
+    })
+  );
+}
+
+function getBrickSpriteKey(brick) {
+  if (brick.indestructible) {
+    return "brickGold";
+  }
+
+  if (brick.type === "hard") {
+    return brick.hitsRemaining > 1 ? "brickSilverBase" : "brickSilver1";
+  }
+
+  return brick.spriteKey;
+}
+
+function pickWeightedDefinition(library) {
+  const entries = Object.values(library);
+  const totalWeight = entries.reduce((sum, entry) => sum + entry.weight, 0);
+
+  if (totalWeight <= 0) {
+    return null;
+  }
+
+  let cursor = Math.random() * totalWeight;
+  for (const entry of entries) {
+    cursor -= entry.weight;
+    if (cursor <= 0) {
+      return entry;
+    }
+  }
+
+  return entries[entries.length - 1] ?? null;
+}
+
+function getRandomEnemySpawnDelay() {
+  return randomRange(GAME_CONFIG.enemies.spawnDelayMin, GAME_CONFIG.enemies.spawnDelayMax);
+}
+
+function randomRange(min, max) {
+  return min + (Math.random() * (max - min));
+}
+
+function rotateVector(x, y, angle) {
+  return {
+    x: (x * Math.cos(angle)) - (y * Math.sin(angle)),
+    y: (x * Math.sin(angle)) + (y * Math.cos(angle))
+  };
+}
+
+function isRectColliding(a, b) {
+  return (
+    a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.height &&
+    a.y + a.height > b.y
+  );
+}
+
+function resolveBallRectResponse(ball, rect) {
+  const wasAbove = ball.previousY + ball.radius <= rect.y;
+  const wasBelow = ball.previousY - ball.radius >= rect.y + rect.height;
+  const wasLeft = ball.previousX + ball.radius <= rect.x;
+  const wasRight = ball.previousX - ball.radius >= rect.x + rect.width;
+
+  if (wasAbove) {
+    ball.y = rect.y - ball.radius - 1;
+    ball.dy = -Math.abs(ball.dy);
+    return;
+  }
+
+  if (wasBelow) {
+    ball.y = rect.y + rect.height + ball.radius + 1;
+    ball.dy = Math.abs(ball.dy);
+    return;
+  }
+
+  if (wasLeft) {
+    ball.x = rect.x - ball.radius - 1;
+    ball.dx = -Math.abs(ball.dx);
+    return;
+  }
+
+  if (wasRight) {
+    ball.x = rect.x + rect.width + ball.radius + 1;
+    ball.dx = Math.abs(ball.dx);
+    return;
+  }
+
+  const overlapX = Math.min(
+    Math.abs((ball.x + ball.radius) - rect.x),
+    Math.abs((rect.x + rect.width) - (ball.x - ball.radius))
+  );
+  const overlapY = Math.min(
+    Math.abs((ball.y + ball.radius) - rect.y),
+    Math.abs((rect.y + rect.height) - (ball.y - ball.radius))
+  );
+
+  if (overlapX < overlapY) {
+    ball.dx *= -1;
+  } else {
+    ball.dy *= -1;
+  }
+}
+
+function getSpriteImage(sprite, elapsed = 0, loop = true) {
+  if (!sprite) {
+    return null;
+  }
+
+  if (sprite.image && (!sprite.frameImages || sprite.frameImages.length === 0)) {
+    return sprite.image;
+  }
+
+  if (!sprite.frameImages || sprite.frameImages.length === 0) {
+    return sprite.image ?? null;
+  }
+
+  const rawIndex = Math.max(0, Math.floor(elapsed * (sprite.fps ?? 8)));
+  const index = loop
+    ? rawIndex % sprite.frameImages.length
+    : Math.min(rawIndex, sprite.frameImages.length - 1);
+
+  return sprite.frameImages[index] ?? sprite.image ?? null;
+}
+
+function getAnimationDuration(sprite) {
+  if (!sprite?.frameImages?.length) {
+    return 0;
+  }
+
+  return sprite.frameImages.length / (sprite.fps ?? 8);
+}
+
+function drawSprite(ctx, sprite, bounds, fallback = () => {}, elapsed = 0, loop = true) {
+  const image = getSpriteImage(sprite, elapsed, loop);
+
+  if (image) {
+    ctx.drawImage(image, bounds.x, bounds.y, bounds.width, bounds.height);
+    return;
+  }
+
+  fallback();
+}

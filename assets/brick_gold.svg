@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="24" viewBox="0 0 64 24">
+  <defs>
+    <linearGradient id="goldBrick" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff1a9"/>
+      <stop offset="100%" stop-color="#c58a1b"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="62" height="22" rx="5" fill="url(#goldBrick)" stroke="#7d5613" stroke-width="2"/>
+  <path d="M10 18L18 6L26 18L34 6L42 18L50 6L54 12" stroke="#fff9df" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+</svg>

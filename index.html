@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arkanoid Legacy</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hud">
+      <div class="hud__item">
+        <span class="hud__label">Score</span>
+        <strong id="score-value">0</strong>
+      </div>
+      <div class="hud__item">
+        <span class="hud__label">Vies</span>
+        <strong id="lives-value">3</strong>
+      </div>
+      <div class="hud__item">
+        <span class="hud__label">Niveau</span>
+        <strong id="level-value">1</strong>
+      </div>
+      <div class="hud__item">
+        <span class="hud__label">Effets</span>
+        <strong id="effect-value">Aucun</strong>
+      </div>
+      <div class="hud__item hud__item--status">
+        <span class="hud__label">Statut</span>
+        <strong id="status-value">Chargement...</strong>
+      </div>
+    </header>
+
+    <section class="game-frame">
+      <canvas
+        id="game-canvas"
+        width="960"
+        height="640"
+        aria-label="Zone de jeu Arkanoid"
+      ></canvas>
+    </section>
+
+    <footer class="help">
+      <p>Souris pour suivre l'axe X, flèches gauche/droite en alternative, <kbd>Espace</kbd> ou clic pour lancer la balle.</p>
+      <p>Quand le laser est actif, <kbd>Espace</kbd> ou clic tirent aussi des projectiles. Le bonus capture retient la balle sur la raquette au rebond suivant.</p>
+      <p>Les ennemis entrent par les portes du haut, errent vers le bas et rebondissent sur les briques et les murs.</p>
+      <p>Les bonus branchés sont : capture, duplication, extension, laser, ralenti, vie et warp.</p>
+      <p>Pour injecter vos sprites, définissez <code>window.ARKANOID_CUSTOM_SPRITES</code> avant le chargement de <code>src/main.js</code>.</p>
+    </footer>
+  </main>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

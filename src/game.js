@@ -1,18 +1,12 @@
 import { Ball, Brick, Enemy, EnemyExplosion, LaserShot, Paddle, PowerUp } from "./entities.js";
-import {
-  BRICK_LIBRARY,
-  COMMON_BRICK_VARIANTS,
-  ENEMY_LIBRARY,
-  GAME_CONFIG,
-  POWERUP_LIBRARY
-} from "./config.js";
-import { LEVELS } from "./levels.js";
+import { ENEMY_LIBRARY, GAME_CONFIG, POWERUP_LIBRARY } from "./config.js";
+import { buildBrickPlacements } from "./levels.js";
 import { loadSprites } from "./sprites.js";
 import { getResolvedSpriteManifest } from "./spriteHooks.js";
 import { clamp, isCircleCollidingWithRect } from "./utils.js";
 
 export class Game {
-  constructor({ canvas, scoreNode, levelNode, statusNode, livesNode, effectNode, sounds = null }) {
+  constructor({ canvas, scoreNode, levelNode, statusNode, livesNode, effectNode, sounds = null, levels = [] }) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.scoreNode = scoreNode;
@@ -21,6 +15,7 @@ export class Game {
     this.livesNode = livesNode;
     this.effectNode = effectNode;
     this.sounds = sounds;
+    this.levels = levels;
 
     this.paddle = new Paddle();
     this.balls = [new Ball()];
@@ -53,6 +48,10 @@ export class Game {
   }
 
   async init() {
+    if (!Array.isArray(this.levels) || this.levels.length === 0) {
+      throw new Error("Aucun niveau disponible");
+    }
+
     this.sprites = await loadSprites(getResolvedSpriteManifest());
     this.loadLevel(0);
     this.updateHud();
@@ -60,7 +59,7 @@ export class Game {
 
   loadLevel(index) {
     this.levelIndex = index;
-    this.bricks = buildBricks(LEVELS[index].layout);
+    this.bricks = buildBricks(this.levels[index].layout);
     this.powerUps = [];
     this.lasers = [];
     this.enemies = [];
@@ -153,9 +152,9 @@ export class Game {
 
     if (this.areDestructibleBricksCleared()) {
       this.scheduleLevelTransition(
-        this.levelIndex < LEVELS.length - 1 ? this.levelIndex + 1 : 0,
+        this.levelIndex < this.levels.length - 1 ? this.levelIndex + 1 : 0,
         1.2,
-        this.levelIndex < LEVELS.length - 1 ? "Niveau suivant" : "Victoire",
+        this.levelIndex < this.levels.length - 1 ? "Niveau suivant" : "Victoire",
         "clear"
       );
     }
@@ -187,6 +186,13 @@ export class Game {
     this.score = 0;
     this.lives = GAME_CONFIG.lives.initial;
     this.loadLevel(0);
+    this.statusText = statusText;
+    this.updateHud();
+  }
+
+  advanceToNextLevel(statusText = "Cheat: niveau suivant") {
+    const nextLevelIndex = this.levelIndex < this.levels.length - 1 ? this.levelIndex + 1 : 0;
+    this.loadLevel(nextLevelIndex);
     this.statusText = statusText;
     this.updateHud();
   }
@@ -655,7 +661,7 @@ export class Game {
   }
 
   activateWarp() {
-    const nextLevel = this.levelIndex < LEVELS.length - 1 ? this.levelIndex + 1 : 0;
+    const nextLevel = this.levelIndex < this.levels.length - 1 ? this.levelIndex + 1 : 0;
     this.scheduleLevelTransition(nextLevel, GAME_CONFIG.warp.transitionDuration, "Warp", "warp");
   }
 
@@ -869,7 +875,7 @@ export class Game {
 
   updateHud() {
     this.scoreNode.textContent = String(this.score);
-    this.levelNode.textContent = `${this.levelIndex + 1} - ${LEVELS[this.levelIndex].name}`;
+    this.levelNode.textContent = `${this.levelIndex + 1} - ${this.levels[this.levelIndex].name}`;
     this.statusNode.textContent = this.statusText;
 
     if (this.livesNode) {
@@ -1113,7 +1119,7 @@ export class Game {
     this.ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
     this.ctx.font = '600 18px "Trebuchet MS", sans-serif';
     this.ctx.textAlign = "left";
-    this.ctx.fillText(LEVELS[this.levelIndex].name, GAME_CONFIG.playfield.left + 12, 58);
+    this.ctx.fillText(this.levels[this.levelIndex].name, GAME_CONFIG.playfield.left + 12, 58);
 
     if (this.hasStuckBalls()) {
       this.ctx.textAlign = "center";
@@ -1247,36 +1253,7 @@ export class Game {
 }
 
 function buildBricks(layout) {
-  const columns = Math.max(...layout.map((row) => row.length));
-  const totalGap = (columns - 1) * GAME_CONFIG.bricks.gap;
-  const usableWidth = GAME_CONFIG.playfield.width - (GAME_CONFIG.bricks.sideMargin * 2) - totalGap;
-  const brickWidth = usableWidth / columns;
-
-  return layout.flatMap((row, rowIndex) =>
-    row.flatMap((value, colIndex) => {
-      const definition = BRICK_LIBRARY[value];
-      if (!definition) {
-        return [];
-      }
-
-      const spriteKey = value === 1
-        ? COMMON_BRICK_VARIANTS[rowIndex % COMMON_BRICK_VARIANTS.length]
-        : definition.spriteKey;
-
-      return [
-        new Brick({
-          x: GAME_CONFIG.playfield.left + GAME_CONFIG.bricks.sideMargin + colIndex * (brickWidth + GAME_CONFIG.bricks.gap),
-          y: GAME_CONFIG.bricks.topOffset + rowIndex * (GAME_CONFIG.bricks.rowHeight + GAME_CONFIG.bricks.gap),
-          width: brickWidth,
-          height: GAME_CONFIG.bricks.rowHeight,
-          definition: {
-            ...definition,
-            spriteKey
-          }
-        })
-      ];
-    })
-  );
+  return buildBrickPlacements(layout).map((placement) => new Brick(placement));
 }
 
 function getBrickSpriteKey(brick) {

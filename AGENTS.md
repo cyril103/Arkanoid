@@ -7,7 +7,8 @@ Récréation du jeu d'arcade classique "Arkanoid" pour navigateur web. Le projet
 - Le moteur gère plusieurs balles simultanées.
 - Le HUD affiche score, vies, niveau, statut et effets actifs.
 - La zone de jeu a une hauteur logique de `544px`, avec `frame.height: 512`.
-- Deux niveaux sont actuellement définis, puis relancés en cycle.
+- Les niveaux source sont définis dans `src/levels.json`, puis relancés en cycle.
+- Un éditeur de niveaux est disponible dans `level-editor.html`.
 - Les sons sont chargés depuis `assets/sounds/` avec manifest surchargable.
 
 ## 3. Architecture Technique
@@ -19,7 +20,9 @@ Récréation du jeu d'arcade classique "Arkanoid" pour navigateur web. Le projet
 - **Boucle de jeu :** `src/game.js`
 - **Entités :** `src/entities.js`
 - **Entrée :** `src/input.js`
-- **Niveaux :** `src/levels.js`
+- **Niveaux source :** `src/levels.json`
+- **Chargement / normalisation / overrides :** `src/levels.js`
+- **Éditeur :** `src/level-editor.js` + `level-editor.html`
 - **Bootstrap :** `src/main.js`
 
 ## 4. Entités et Composants
@@ -75,16 +78,25 @@ Récréation du jeu d'arcade classique "Arkanoid" pour navigateur web. Le projet
 - **Collisions :** cercle/rectangle pour les balles, rectangle/rectangle pour bonus, ennemis et lasers.
 - **Multi-balles :** le moteur maintient une liste de balles actives.
 - **Vies :** compteur de vies avec animation d'explosion du paddle, reset de manche et relance de partie.
-- **Progression :** niveaux décrits par matrices dans `src/levels.js`.
+- **Progression :** niveaux décrits par matrices JSON dans `src/levels.json`, normalisés par `src/levels.js`.
 - **Score :** points de briques, ennemis et bonus de collecte.
 - **Cycle :** la fin du dernier niveau recharge le premier.
+- **Raccourcis debug :**
+  - `F2` ouvre l'éditeur de niveaux sur le niveau courant
+  - `N` force le passage au niveau suivant
 
 ## 6. Personnalisation des Sprites et Sons
 - Le manifest de sprites par défaut est défini dans `src/config.js`.
 - Le manifest audio par défaut est aussi défini dans `src/config.js`.
 - Les overrides de sprites passent par `window.ARKANOID_CUSTOM_SPRITES`.
 - Les overrides audio passent par `window.ARKANOID_CUSTOM_SOUNDS`.
+- Les overrides de niveaux passent par `window.ARKANOID_CUSTOM_LEVELS` ou par l'override local enregistré par l'éditeur.
 - Un exemple complet de surcharge de sprites est fourni dans `src/sprite-overrides.example.js`.
+- Priorité de chargement des niveaux :
+  - `window.ARKANOID_CUSTOM_LEVELS`
+  - override local `localStorage`
+  - `src/levels.json`
+  - `FALLBACK_LEVEL_DATA`
 - Le manifest sprite supporte :
   - `src` pour un sprite fixe
   - `frames` pour une animation
@@ -104,5 +116,7 @@ Récréation du jeu d'arcade classique "Arkanoid" pour navigateur web. Le projet
 ## 8. Conventions de Travail
 - Préserver la structure `/src`, `/assets`, `/css`.
 - Garder les mécaniques centralisées dans `src/game.js` et les données statiques dans `src/config.js`.
+- Considérer `src/levels.json` comme la source durable des niveaux du projet ; l'override de l'éditeur sert surtout au test local.
+- Toute évolution du format de niveau doit rester compatible avec l'éditeur et avec la normalisation de `src/levels.js`.
 - Toute nouvelle mécanique doit être branchée sur les sprites existants avant d'introduire de nouveaux placeholders.
 - Toute mise à jour documentaire doit rester alignée avec les manifests et le comportement réel du code.

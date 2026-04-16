@@ -10,7 +10,8 @@ Récréation d'Arkanoid pour navigateur web, développée en HTML5 Canvas avec m
 - Bonus actifs : `catch`, `duplicate`, `expand`, `laser`, `slow`, `life`, `warp`.
 - Ennemis animés entrant par les portes du haut.
 - Explosion du paddle, transition de matérialisation, séquences laser et élargissement.
-- Deux niveaux actuellement définis dans `src/levels.js`, bouclés en cycle.
+- Deux niveaux actuellement définis dans `src/levels.json`, bouclés en cycle.
+- Un éditeur visuel est disponible dans `level-editor.html`.
 
 ## Démarrage
 
@@ -34,6 +35,8 @@ python -m http.server 8080
 - Clavier : `Flèche gauche/droite`, `A/D` ou `Q/D`.
 - `Espace` ou clic : lancer la balle.
 - `Espace` ou clic avec `laser` actif : tirer.
+- `F2` : ouvrir l'éditeur de niveaux sur le niveau courant.
+- `N` : passer immédiatement au niveau suivant.
 
 ## Architecture
 
@@ -41,7 +44,8 @@ python -m http.server 8080
 - `src/game.js` : boucle de jeu, collisions, bonus, progression, HUD.
 - `src/entities.js` : paddle, balles, briques, bonus, lasers, ennemis.
 - `src/input.js` : souris, clavier, clic et file d'actions.
-- `src/levels.js` : matrices de niveaux.
+- `src/levels.json` : données de niveaux éditables.
+- `src/levels.js` : chargement, normalisation, overrides et helpers de placement.
 - `src/main.js` : bootstrap, canvas, HUD, chargement audio.
 
 ## Personnalisation
@@ -50,6 +54,7 @@ Le jeu lit automatiquement :
 
 - `window.ARKANOID_CUSTOM_SPRITES`
 - `window.ARKANOID_CUSTOM_SOUNDS`
+- `window.ARKANOID_CUSTOM_LEVELS`
 
 Ces overrides doivent être définis avant le chargement de `src/main.js`.
 
@@ -86,6 +91,13 @@ Les sons chargés par défaut depuis `assets/sounds/` couvrent :
 - bonus de vie
 
 ## Niveaux et progression
+
+- Les niveaux sont chargés depuis `src/levels.json`.
+- Le format recommandé est un objet JSON avec `version` et `levels`.
+- Chaque niveau contient `id`, `name` et `layout`.
+- Les cellules de `layout` utilisent `null`, `blue`, `orange`, `green`, `red`, `white`, `yellow`, `pink`, `cyan`, `silver` ou `gold`.
+- Le chargeur conserve une compatibilité avec l'ancien format numérique `0/1/2/3`.
+- `level-editor.html` permet d'éditer la grille, d'exporter le JSON et d'appliquer un override local relu ensuite par le jeu.
 
 - Les briques standards valent 100 points.
 - Les briques argent résistent à deux impacts et jouent une animation sur le premier.

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arkanoid Legacy | Éditeur de niveaux</title>
+  <link rel="stylesheet" href="css/editor.css">
+</head>
+<body>
+  <main class="editor-shell">
+    <header class="editor-hero">
+      <div>
+        <p class="editor-hero__eyebrow">Arkanoid Legacy</p>
+        <h1>Éditeur de niveaux</h1>
+        <p class="editor-hero__text">Éditez la grille, prévisualisez le placement réel des briques et appliquez un override local relu automatiquement par le jeu.</p>
+      </div>
+      <div class="editor-hero__actions">
+        <a class="editor-link" href="index.html">Ouvrir le jeu</a>
+        <a class="editor-link editor-link--muted" href="README.md">Documentation</a>
+      </div>
+    </header>
+
+    <section class="editor-layout">
+      <aside class="editor-sidebar">
+        <section class="editor-card">
+          <div class="editor-card__header">
+            <h2>Niveaux</h2>
+            <span id="editor-source-badge" class="editor-badge">Chargement…</span>
+          </div>
+          <label class="editor-field">
+            <span>Niveau actif</span>
+            <select id="level-select"></select>
+          </label>
+          <div class="editor-actions">
+            <button id="new-level-button" type="button">Nouveau</button>
+            <button id="duplicate-level-button" type="button">Dupliquer</button>
+            <button id="delete-level-button" type="button" class="button-danger">Supprimer</button>
+          </div>
+          <label class="editor-field">
+            <span>ID</span>
+            <input id="level-id-input" type="text" spellcheck="false">
+          </label>
+          <label class="editor-field">
+            <span>Nom</span>
+            <input id="level-name-input" type="text" spellcheck="false">
+          </label>
+        </section>
+
+        <section class="editor-card">
+          <div class="editor-card__header">
+            <h2>Grille</h2>
+            <span id="grid-size-label" class="editor-meta">0 x 0</span>
+          </div>
+          <div class="editor-grid-controls">
+            <label class="editor-field">
+              <span>Lignes</span>
+              <input id="rows-input" type="number" min="1" max="30">
+            </label>
+            <label class="editor-field">
+              <span>Colonnes</span>
+              <input id="columns-input" type="number" min="1" max="30">
+            </label>
+          </div>
+          <div class="editor-actions">
+            <button id="resize-grid-button" type="button">Redimensionner</button>
+            <button id="clear-grid-button" type="button">Vider la grille</button>
+          </div>
+          <p class="editor-note">Clic gauche pour peindre. Clic droit pour effacer rapidement.</p>
+        </section>
+
+        <section class="editor-card">
+          <div class="editor-card__header">
+            <h2>Palette</h2>
+            <span id="selection-label" class="editor-meta">Sélection : Vide</span>
+          </div>
+          <div id="palette-grid" class="palette-grid"></div>
+        </section>
+
+        <section class="editor-card">
+          <div class="editor-card__header">
+            <h2>Actions</h2>
+            <span id="editor-status" class="editor-meta">Prêt</span>
+          </div>
+          <div class="editor-actions editor-actions--stack">
+            <button id="apply-overrides-button" type="button">Appliquer au jeu</button>
+            <button id="reset-overrides-button" type="button">Retirer l'override du jeu</button>
+            <button id="copy-json-button" type="button">Copier le JSON</button>
+            <button id="download-json-button" type="button">Télécharger le JSON</button>
+            <button id="import-json-button" type="button">Importer depuis la zone JSON</button>
+          </div>
+        </section>
+      </aside>
+
+      <section class="editor-main">
+        <section class="editor-card">
+          <div class="editor-card__header">
+            <h2>Grille interactive</h2>
+            <span id="level-summary" class="editor-meta"></span>
+          </div>
+          <div id="editor-grid" class="editor-grid" aria-label="Grille de niveau"></div>
+        </section>
+
+        <section class="editor-card">
+          <div class="editor-card__header">
+            <h2>Aperçu</h2>
+            <span class="editor-meta">Placement et largeur réels des briques</span>
+          </div>
+          <div class="preview-frame">
+            <canvas id="preview-canvas" width="800" height="544" aria-label="Aperçu du niveau"></canvas>
+          </div>
+        </section>
+
+        <section class="editor-card">
+          <div class="editor-card__header">
+            <h2>JSON</h2>
+            <span class="editor-meta">Format exportable vers le projet</span>
+          </div>
+          <textarea id="json-output" class="editor-json" spellcheck="false"></textarea>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="src/level-editor.js"></script>
+</body>
+</html>

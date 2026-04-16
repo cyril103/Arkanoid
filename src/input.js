@@ -3,7 +3,9 @@ export function createInputController(canvas) {
   const state = {
     pointerX: null,
     axis: 0,
-    launchQueued: false
+    launchQueued: false,
+    editorQueued: false,
+    nextLevelQueued: false
   };
 
   canvas.tabIndex = 0;
@@ -28,6 +30,8 @@ export function createInputController(canvas) {
   );
 
   const isLaunchKey = (event) => event.code === "Space" || event.key === " ";
+  const isEditorKey = (event) => event.code === "F2";
+  const isNextLevelKey = (event) => event.code === "KeyN" || event.key === "n" || event.key === "N";
 
   const updateAxis = () => {
     const left = heldKeys.has("left");
@@ -66,7 +70,7 @@ export function createInputController(canvas) {
   };
 
   const onKeyDown = (event) => {
-    if (isLeftKey(event) || isRightKey(event) || isLaunchKey(event)) {
+    if (isLeftKey(event) || isRightKey(event) || isLaunchKey(event) || isEditorKey(event) || isNextLevelKey(event)) {
       event.preventDefault();
     }
 
@@ -78,6 +82,14 @@ export function createInputController(canvas) {
 
     if (isLaunchKey(event)) {
       state.launchQueued = true;
+    }
+
+    if (isEditorKey(event)) {
+      state.editorQueued = true;
+    }
+
+    if (isNextLevelKey(event)) {
+      state.nextLevelQueued = true;
     }
   };
 
@@ -109,6 +121,16 @@ export function createInputController(canvas) {
     consumeLaunch() {
       const queued = state.launchQueued;
       state.launchQueued = false;
+      return queued;
+    },
+    consumeEditorRequest() {
+      const queued = state.editorQueued;
+      state.editorQueued = false;
+      return queued;
+    },
+    consumeNextLevelRequest() {
+      const queued = state.nextLevelQueued;
+      state.nextLevelQueued = false;
       return queued;
     },
     dispose() {

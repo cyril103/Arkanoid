@@ -1,14 +1,3 @@
-export const COMMON_BRICK_VARIANTS = Object.freeze([
-  "brickBlue",
-  "brickOrange",
-  "brickGreen",
-  "brickRed",
-  "brickWhite",
-  "brickYellow",
-  "brickPink",
-  "brickCyan"
-]);
-
 export const GAME_CONFIG = Object.freeze({
   canvasWidth: 800,
   canvasHeight: 544,
@@ -89,29 +78,6 @@ export const GAME_CONFIG = Object.freeze({
   warp: {
     transitionDuration: 0.55,
     doorFps: 14
-  }
-});
-
-export const BRICK_LIBRARY = Object.freeze({
-  0: null,
-  1: {
-    type: "common",
-    hits: 1,
-    points: 100,
-    spriteKey: "brickBlue"
-  },
-  2: {
-    type: "hard",
-    hits: 2,
-    points: 250,
-    spriteKey: "brickSilverBase"
-  },
-  3: {
-    type: "gold",
-    hits: Number.POSITIVE_INFINITY,
-    points: 0,
-    spriteKey: "brickGold",
-    indestructible: true
   }
 });
 

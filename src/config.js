@@ -130,7 +130,7 @@ export const POWERUP_LIBRARY = Object.freeze({
     type: "life",
     label: "Vie",
     spriteKey: "powerupLife",
-    weight: 2
+    weight: 1
   }
 });
 

@@ -5,12 +5,16 @@ Jeu Arkanoid pour navigateur web, basé sur HTML5 Canvas et modules ES. Le proje
 
 ## 2. État actuel
 - Multi-balles actives.
-- HUD complet : score, vies, niveau, effets, statut.
+- HUD minimaliste à droite du canvas : `1 UP` et `HIGH SCORE`.
+- Meilleur score sauvegardé localement dans `localStorage` (`arkanoid.highScore`).
+- Police arcade du HUD chargée depuis `assets/fonts/emulogic.ttf`.
 - Bonus jouables : `catch`, `duplicate`, `expand`, `laser`, `slow`, `life`, `warp`.
-- Ennemis animés avec portes d'entrée en haut de l'aire de jeu.
+- Bonus non cumulables : une pilule remplace l'effet persistant précédent.
+- Effets `catch`, `expand`, `laser` et `slow` sans timer ; ils cessent à la perte de balle ou au changement de niveau.
+- Ennemis animés avec portes d'entrée en haut de l'aire de jeu et type choisi par niveau.
 - Sons chargés depuis `assets/sounds/`.
 - Explosion du paddle et rematérialisation déjà intégrées.
-- Niveaux source chargés depuis `src/levels.json`.
+- Niveaux source version `3` chargés depuis `src/levels.json`.
 - Éditeur de niveaux disponible dans `level-editor.html`.
 
 ## 3. Architecture
@@ -32,12 +36,17 @@ Jeu Arkanoid pour navigateur web, basé sur HTML5 Canvas et modules ES. Le proje
 ## 5. Points d'attention
 - La brique argent utilise `brick_silver.png` puis l'animation `brick_silver_1..10`.
 - L'activation laser joue `paddle_laser_*` puis maintient la dernière frame pendant l'effet.
+- La perte d'une vie ou le changement de niveau remet le paddle à l'état normal.
 - Le cycle de niveaux repart au début après le dernier niveau défini.
+- Chaque niveau définit `enemyType` (`cone`, `cube`, `molecule`, `pyramid`) ; l'éditeur expose ce choix.
+- Les ennemis spawnent centrés sur l'ouverture de porte correspondante.
+- Les ennemis utilisent un cercle réduit uniquement pour leur blocage contre les briques.
 - `F2` ouvre l'éditeur sur le niveau courant.
 - `N` passe immédiatement au niveau suivant.
 - Priorité de chargement des niveaux : override runtime, override `localStorage`, `src/levels.json`, puis `FALLBACK_LEVEL_DATA`.
+- Les overrides locaux antérieurs au format courant sont migrés avec les types d'ennemis du fichier source quand c'est possible.
 
 ## 6. Travail restant
 - Raffiner le comportement du `warp` pour se rapprocher davantage de l'arcade originale.
 - Éventuellement ajouter une transition visuelle de sortie du bonus `laser`.
-- Étendre la banque de niveaux si l'on veut sortir du cycle actuel de deux stages.
+- Étendre la banque de niveaux si l'on veut sortir du cycle actuel des niveaux définis dans `src/levels.json`.

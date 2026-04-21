@@ -7,6 +7,7 @@ Le jeu charge automatiquement le pack d'assets de ce dossier via les manifests d
 - Briques : `brick_blue.png`, `brick_orange.png`, `brick_green.png`, `brick_red.png`, `brick_white.png`, `brick_yellow.png`, `brick_pink.png`, `brick_cyan.png`, `brick_silver.png`, `brick_silver_1.png` à `brick_silver_10.png`, `brick_gold.png`
 - Cadre : `edge_top.png`, `edge_left.png`, `edge_right.png`
 - Interface : `logo.png`
+- Police HUD : `fonts/emulogic.ttf`
 - Bonus : `powerup_catch_*`, `powerup_duplicate_*`, `powerup_expand_*`, `powerup_laser_*`, `powerup_slow_*`, `powerup_life_*`, `powerup_warp_*`
 - Projectiles et transitions : `laser_bullet.png`, `door_top_left_*`, `door_top_right_*`
 - Ennemis : `enemy_cone_*`, `enemy_cube_*`, `enemy_molecule_*`, `enemy_pyramid_*`, `enemy_explosion_*`

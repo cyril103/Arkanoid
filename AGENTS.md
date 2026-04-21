@@ -5,7 +5,9 @@ Récréation du jeu d'arcade classique "Arkanoid" pour navigateur web. Le projet
 - Le jeu charge par défaut les sprites PNG du dossier `assets/`.
 - Les placeholders SVG sont encore présents dans le dépôt, mais ne constituent plus le rendu nominal.
 - Le moteur gère plusieurs balles simultanées.
-- Le HUD affiche score, vies, niveau, statut et effets actifs.
+- Le HUD est minimaliste et placé à droite du canvas : `1 UP` affiche le score courant, `HIGH SCORE` affiche le meilleur score local.
+- Le meilleur score est persisté dans `localStorage` avec la clé `arkanoid.highScore`.
+- La police du HUD est chargée depuis `assets/fonts/emulogic.ttf`.
 - La zone de jeu a une hauteur logique de `544px`, avec `frame.height: 512`.
 - Les niveaux source sont définis dans `src/levels.json`, puis relancés en cycle.
 - Un éditeur de niveaux est disponible dans `level-editor.html`.
@@ -33,6 +35,7 @@ Récréation du jeu d'arcade classique "Arkanoid" pour navigateur web. Le projet
 - **Transition laser :** la séquence `paddle_laser_*` est jouée une seule fois à l'activation du bonus, puis le paddle reste figé sur sa dernière frame pendant l'effet.
 - **Destruction :** la séquence `paddle_explode_*` est jouée lors de la perte de la dernière balle active avant respawn ou reset de partie.
 - **Physique :** l'impact sur la raquette module l'angle de rebond.
+- **Reset visuel :** le paddle redevient normal à la perte d'une vie ou au changement de niveau.
 
 ### B. Les Balles
 - **Sprite :** `assets/ball.png`
@@ -60,6 +63,9 @@ Récréation du jeu d'arcade classique "Arkanoid" pour navigateur web. Le projet
   - `life`
   - `warp`
 - **Sprites actifs :** `powerup_catch_*`, `powerup_duplicate_*`, `powerup_expand_*`, `powerup_laser_*`, `powerup_slow_*`, `powerup_life_*`, `powerup_warp_*`
+- **Cumul :** les effets de pilules ne se cumulent pas ; une nouvelle pilule annule l'effet persistant précédent.
+- **Durée :** `catch`, `expand`, `laser` et `slow` restent actifs sans timer jusqu'à perte de balle ou changement de niveau.
+- **Instantanés :** `duplicate`, `life` et `warp` annulent aussi l'effet précédent, même s'ils appliquent un effet immédiat.
 
 ### E. Projectiles et Transition
 - **Laser :** `assets/laser_bullet.png`
@@ -69,17 +75,21 @@ Récréation du jeu d'arcade classique "Arkanoid" pour navigateur web. Le projet
 - **Sprites actifs :** `enemy_cone_*`, `enemy_cube_*`, `enemy_molecule_*`, `enemy_pyramid_*`
 - **Explosion :** `enemy_explosion_*`
 - **Comportement :**
-  - entrée par les portes du haut avec animation de porte
-  - dérive aléatoire vers le bas, collisions avec briques et murs
+  - un seul type d'ennemi par niveau, défini par `enemyType`
+  - entrée centrée sur l'ouverture réelle d'une des portes du haut avec animation de porte
+  - dérive aléatoire vers le bas, collisions avec murs et briques
+  - collision contre les briques via un cercle réduit pour leur laisser plus de liberté de mouvement
   - explosion au contact de la raquette ou sous les tirs laser
   - si un ennemi atteint le bas sans toucher la raquette, il est replacé en haut et ressort par une des deux portes
 
 ## 5. Logique de Jeu
-- **Collisions :** cercle/rectangle pour les balles, rectangle/rectangle pour bonus, ennemis et lasers.
+- **Collisions :** cercle/rectangle pour les balles, rectangle/rectangle pour bonus, lasers et contacts ennemis ; les ennemis utilisent un cercle réduit uniquement pour leur blocage contre les briques.
 - **Multi-balles :** le moteur maintient une liste de balles actives.
 - **Vies :** compteur de vies avec animation d'explosion du paddle, reset de manche et relance de partie.
-- **Progression :** niveaux décrits par matrices JSON dans `src/levels.json`, normalisés par `src/levels.js`.
-- **Score :** points de briques, ennemis et bonus de collecte.
+- **Progression :** niveaux version `3` décrits par matrices JSON dans `src/levels.json`, normalisés par `src/levels.js`.
+- **Types d'ennemis :** chaque niveau porte `enemyType` (`cone`, `cube`, `molecule`, `pyramid`) et l'éditeur permet de le choisir.
+- **Overrides legacy :** les overrides locaux de niveaux antérieurs à la version courante sont migrés avec les `enemyType` du fichier source quand c'est possible.
+- **Score :** points de briques, ennemis et bonus de collecte ; meilleur score sauvegardé localement.
 - **Cycle :** la fin du dernier niveau recharge le premier.
 - **Raccourcis debug :**
   - `F2` ouvre l'éditeur de niveaux sur le niveau courant

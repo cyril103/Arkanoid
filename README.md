@@ -6,14 +6,17 @@ Récréation d'Arkanoid pour navigateur web, développée en HTML5 Canvas avec m
 
 - Rendu nominal sur sprites PNG, sans dépendre des placeholders SVG.
 - Gestion de plusieurs balles simultanées.
-- HUD avec score, vies, niveau, statut et effet actif.
+- HUD minimaliste à droite du canvas : `1 UP` et `HIGH SCORE`.
+- Meilleur score conservé en `localStorage` via `arkanoid.highScore`.
 - Bonus actifs : `catch`, `duplicate`, `expand`, `laser`, `slow`, `life`, `warp`.
 - Une seule pilule bonus peut être active à la fois : collecter une nouvelle pilule annule l'effet précédent.
 - Les effets persistants restent actifs jusqu'à une perte de balle ou un changement de niveau.
-- Ennemis animés entrant par les portes du haut, avec un seul type d'ennemi par niveau.
+- Ennemis animés entrant par les ouvertures des portes du haut, avec un seul type d'ennemi par niveau.
+- Collision ennemis/briques assouplie par un cercle de blocage réduit pour favoriser leur mouvement.
 - Explosion du paddle, transition de matérialisation, séquences laser et élargissement.
-- Trois niveaux actuellement définis dans `src/levels.json`, bouclés en cycle.
+- Sept niveaux actuellement définis dans `src/levels.json`, bouclés en cycle.
 - Un éditeur visuel est disponible dans `level-editor.html`.
+- La police arcade du HUD est chargée depuis `assets/fonts/emulogic.ttf`.
 
 ## Démarrage
 
@@ -96,10 +99,12 @@ Les sons chargés par défaut depuis `assets/sounds/` couvrent :
 
 - Les niveaux sont chargés depuis `src/levels.json`.
 - Le format recommandé est un objet JSON avec `version` et `levels`.
+- La version courante du format est `3`.
 - Chaque niveau contient `id`, `name`, `enemyType` et `layout`.
 - `enemyType` accepte `cone`, `cube`, `molecule` ou `pyramid`.
 - Les cellules de `layout` utilisent `null`, `blue`, `orange`, `green`, `red`, `white`, `yellow`, `pink`, `cyan`, `silver` ou `gold`.
 - Le chargeur conserve une compatibilité avec l'ancien format numérique `0/1/2/3`.
+- Les anciens overrides locaux de niveaux sont migrés avec les `enemyType` de `src/levels.json` quand ils viennent d'un format antérieur.
 - `level-editor.html` permet d'éditer la grille, de choisir le type d'ennemi du niveau, d'exporter le JSON et d'appliquer un override local relu ensuite par le jeu.
 
 - Les briques standards valent 100 points.

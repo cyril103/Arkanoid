@@ -8,36 +8,39 @@
 </head>
 <body>
   <main class="app-shell">
-    <header class="hud">
-      <div class="hud__item">
-        <span class="hud__label">Score</span>
-        <strong id="score-value">0</strong>
-      </div>
-      <div class="hud__item">
-        <span class="hud__label">Vies</span>
-        <strong id="lives-value">3</strong>
-      </div>
-      <div class="hud__item">
-        <span class="hud__label">Niveau</span>
-        <strong id="level-value">1</strong>
-      </div>
-      <div class="hud__item">
-        <span class="hud__label">Effets</span>
-        <strong id="effect-value">Aucun</strong>
-      </div>
-      <div class="hud__item hud__item--status">
-        <span class="hud__label">Statut</span>
-        <strong id="status-value">Chargement...</strong>
-      </div>
-    </header>
+    <section class="arcade-stage">
+      <section class="game-frame">
+        <canvas
+          id="game-canvas"
+          width="800"
+          height="638"
+          aria-label="Zone de jeu Arkanoid"
+        ></canvas>
+      </section>
 
-    <section class="game-frame">
-      <canvas
-        id="game-canvas"
-        width="800"
-        height="638"
-        aria-label="Zone de jeu Arkanoid"
-      ></canvas>
+      <aside class="hud" aria-label="HUD">
+        <div class="hud__marquee">Arkanoid</div>
+        <div class="hud__item hud__item--score">
+          <span class="hud__label">Score</span>
+          <strong id="score-value">0</strong>
+        </div>
+        <div class="hud__item">
+          <span class="hud__label">Vies</span>
+          <strong id="lives-value">3</strong>
+        </div>
+        <div class="hud__item">
+          <span class="hud__label">Niveau</span>
+          <strong id="level-value">1</strong>
+        </div>
+        <div class="hud__item">
+          <span class="hud__label">Effet</span>
+          <strong id="effect-value">Aucun</strong>
+        </div>
+        <div class="hud__item hud__item--status">
+          <span class="hud__label">Statut</span>
+          <strong id="status-value">Chargement...</strong>
+        </div>
+      </aside>
     </section>
 
     <footer class="help">

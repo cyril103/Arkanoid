@@ -54,8 +54,8 @@ export const GAME_CONFIG = Object.freeze({
   },
   enemies: {
     maxActive: 3,
-    spawnDelayMin: 8,
-    spawnDelayMax: 14,
+    spawnDelayMin: 1,
+    spawnDelayMax: 5,
     spawnYOffset: 1,
     doorOpenings: {
       left: {
@@ -79,7 +79,7 @@ export const GAME_CONFIG = Object.freeze({
     height: 19,
     fallSpeed: 120,
     animationFps: 10,
-    spawnChance: 0.15,
+    spawnChance: 0.50,
     slowSpeedFactor: 0.74
   },
   laser: {

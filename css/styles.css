@@ -92,6 +92,7 @@ body::before {
   display: block;
   width: 100%;
   height: auto;
+  cursor: none;
   border: 1px solid rgba(47, 243, 255, 0.28);
   border-radius: 4px;
   background: linear-gradient(180deg, rgba(10, 19, 43, 0.96), rgba(5, 8, 20, 0.98));

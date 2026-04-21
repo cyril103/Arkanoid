@@ -42,7 +42,9 @@ export const GAME_CONFIG = Object.freeze({
   },
   ball: {
     radius: 5,
-    launchSpeed: 450,
+    launchSpeed: 300,
+    speedIncreasePerBounce: 5,
+    maxSpeed: 680,
     maxBounceAngle: (70 * Math.PI) / 180
   },
   bricks: {

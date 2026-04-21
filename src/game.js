@@ -48,6 +48,7 @@ export class Game {
     this.pendingTransitionReason = null;
     this.elapsed = 0;
     this.paddleRespawnElapsed = 0;
+    this.currentBallSpeed = GAME_CONFIG.ball.launchSpeed;
     this.laserCooldownRemaining = 0;
     this.enemySpawnCooldown = getRandomEnemySpawnDelay();
     this.activeEffects = {
@@ -235,7 +236,7 @@ export class Game {
     if (hadSlow) {
       for (const ball of this.balls) {
         if (!ball.stuckToPaddle) {
-          ball.setSpeed(GAME_CONFIG.ball.launchSpeed);
+          this.applyCurrentBallSpeed(ball);
         }
       }
     }
@@ -246,6 +247,7 @@ export class Game {
   }
 
   resetBallState() {
+    this.resetBallSpeedProgression();
     this.paddle = new Paddle();
     this.syncPaddleWidthWithEffects();
     const ball = new Ball();
@@ -375,8 +377,38 @@ export class Game {
   }
 
   applyCurrentBallSpeed(ball) {
+    ball.setSpeed(this.getCurrentBallSpeed());
+  }
+
+  getCurrentBallSpeed() {
+    const speed = this.currentBallSpeed || GAME_CONFIG.ball.launchSpeed;
     if (this.activeEffects.slow > 0) {
-      ball.setSpeed(GAME_CONFIG.ball.launchSpeed * GAME_CONFIG.powerUps.slowSpeedFactor);
+      return speed * GAME_CONFIG.powerUps.slowSpeedFactor;
+    }
+
+    return speed;
+  }
+
+  resetBallSpeedProgression() {
+    this.currentBallSpeed = GAME_CONFIG.ball.launchSpeed;
+  }
+
+  increaseBallSpeedAfterBounce() {
+    const maxSpeed = Math.max(GAME_CONFIG.ball.launchSpeed, GAME_CONFIG.ball.maxSpeed);
+    const nextSpeed = Math.min(
+      maxSpeed,
+      this.currentBallSpeed + GAME_CONFIG.ball.speedIncreasePerBounce
+    );
+
+    if (nextSpeed === this.currentBallSpeed) {
+      return;
+    }
+
+    this.currentBallSpeed = nextSpeed;
+    for (const ball of this.balls) {
+      if (!ball.stuckToPaddle) {
+        this.applyCurrentBallSpeed(ball);
+      }
     }
   }
 
@@ -659,7 +691,7 @@ export class Game {
         this.activeEffects.slow = 1;
         for (const ball of this.balls) {
           if (!ball.stuckToPaddle) {
-            ball.setSpeed(GAME_CONFIG.ball.launchSpeed * GAME_CONFIG.powerUps.slowSpeedFactor);
+            this.applyCurrentBallSpeed(ball);
           }
         }
         break;
@@ -833,6 +865,7 @@ export class Game {
       }
 
       resolveBallRectResponse(ball, brick);
+      this.increaseBallSpeedAfterBounce();
       this.playSound("brickBounce");
       this.damageBrick(brick);
       break;

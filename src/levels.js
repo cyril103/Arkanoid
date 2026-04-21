@@ -1,6 +1,6 @@
 import { ENEMY_LIBRARY, GAME_CONFIG } from "./config.js";
 
-export const LEVEL_FILE_VERSION = 2;
+export const LEVEL_FILE_VERSION = 3;
 export const LEVEL_STORAGE_KEY = "arkanoid.customLevels";
 export const DEFAULT_LEVEL_ENEMY_TYPE = "cone";
 export const LEVEL_ENEMY_TYPES = Object.freeze(Object.keys(ENEMY_LIBRARY));
@@ -211,26 +211,8 @@ export function serializeLevels(levels) {
 }
 
 export function getLevelOverrides() {
-  const runtimeOverride = globalThis.ARKANOID_CUSTOM_LEVELS;
-  if (runtimeOverride) {
-    return normalizeLevelCollection(runtimeOverride);
-  }
-
-  if (!globalThis.localStorage) {
-    return null;
-  }
-
-  try {
-    const raw = globalThis.localStorage.getItem(LEVEL_STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    return normalizeLevelCollection(JSON.parse(raw));
-  } catch (error) {
-    console.warn("Override de niveaux ignoré", error);
-    return null;
-  }
+  const source = getLevelOverrideSource();
+  return source ? normalizeLevelCollection(source) : null;
 }
 
 export function setLevelOverrides(levels) {
@@ -260,14 +242,67 @@ export function clearLevelOverrides() {
 
 export async function loadLevels({ forceRefresh = false, ignoreOverrides = false } = {}) {
   if (!ignoreOverrides) {
-    const overrides = getLevelOverrides();
-    if (overrides) {
+    const overrideSource = getLevelOverrideSource();
+    if (overrideSource) {
+      const baseLevels = await loadBaseLevels(forceRefresh);
+      const overrides = normalizeLevelCollection(
+        applyBaseEnemyTypeDefaults(overrideSource, baseLevels.levels)
+      );
       return cloneLevels(overrides.levels);
     }
   }
 
   const baseLevels = await loadBaseLevels(forceRefresh);
   return cloneLevels(baseLevels.levels);
+}
+
+function getLevelOverrideSource() {
+  const runtimeOverride = globalThis.ARKANOID_CUSTOM_LEVELS;
+  if (runtimeOverride) {
+    return runtimeOverride;
+  }
+
+  if (!globalThis.localStorage) {
+    return null;
+  }
+
+  try {
+    const raw = globalThis.localStorage.getItem(LEVEL_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    console.warn("Override de niveaux ignoré", error);
+    return null;
+  }
+}
+
+function applyBaseEnemyTypeDefaults(source, baseLevels) {
+  const payload = Array.isArray(source) ? { levels: source } : (source ?? {});
+  const levels = Array.isArray(payload.levels) ? payload.levels : [];
+  const baseEnemyTypesById = new Map(baseLevels.map((level) => [level.id, level.enemyType]));
+  const shouldMigrateEnemyTypes = clampInteger(payload.version ?? 1, 1, 9999) < LEVEL_FILE_VERSION;
+
+  return {
+    ...payload,
+    levels: levels.map((level, index) => {
+      if (!level || typeof level !== "object") {
+        return level;
+      }
+
+      if (!shouldMigrateEnemyTypes && hasLevelEnemyType(level)) {
+        return level;
+      }
+
+      const levelId = sanitizeId(level.id, index);
+      const enemyType = baseEnemyTypesById.get(levelId) ?? baseLevels[index]?.enemyType;
+      return enemyType ? { ...level, enemyType } : level;
+    })
+  };
+}
+
+function hasLevelEnemyType(level) {
+  return [level.enemyType, level.enemy, level.enemyKind].some((value) => (
+    String(value ?? "").trim() !== ""
+  ));
 }
 
 export function buildBrickPlacements(layout) {

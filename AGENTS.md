@@ -8,6 +8,7 @@ Récréation du jeu d'arcade classique "Arkanoid" pour navigateur web. Le projet
 - Le HUD est minimaliste et placé à droite du canvas : `1 UP` affiche le score courant, `HIGH SCORE` affiche le meilleur score local.
 - Le meilleur score est persisté dans `localStorage` avec la clé `arkanoid.highScore`.
 - La police du HUD est chargée depuis `assets/fonts/emulogic.ttf`.
+- Le curseur système est masqué quand il survole le canvas de jeu.
 - La zone de jeu a une hauteur logique de `544px`, avec `frame.height: 512`.
 - Les niveaux source sont définis dans `src/levels.json`, puis relancés en cycle.
 - Un éditeur de niveaux est disponible dans `level-editor.html`.
@@ -40,6 +41,7 @@ Récréation du jeu d'arcade classique "Arkanoid" pour navigateur web. Le projet
 ### B. Les Balles
 - **Sprite :** `assets/ball.png`
 - **Comportement :** rebond sur murs, plafond, raquette et briques.
+- **Vitesse :** démarre à `GAME_CONFIG.ball.launchSpeed`, augmente seulement après les rebonds contre les briques via `speedIncreasePerBounce`, plafonne à `maxSpeed`, puis revient à la normale après perte de balle ou changement de niveau.
 - **État spécial :** une ou plusieurs balles peuvent être collées à la raquette avec le bonus `catch`.
 
 ### C. Les Briques
@@ -52,6 +54,7 @@ Récréation du jeu d'arcade classique "Arkanoid" pour navigateur web. Le projet
   - état initial : `assets/brick_silver.png`
   - premier impact : animation `assets/brick_silver_1.png` à `assets/brick_silver_10.png`
   - après animation : la brique reste endommagée avant destruction au second coup
+  - ne génère jamais de capsule bonus
 
 ### D. Les Bonus
 - **Bonus implémentés :**
@@ -85,6 +88,7 @@ Récréation du jeu d'arcade classique "Arkanoid" pour navigateur web. Le projet
 ## 5. Logique de Jeu
 - **Collisions :** cercle/rectangle pour les balles, rectangle/rectangle pour bonus, lasers et contacts ennemis ; les ennemis utilisent un cercle réduit uniquement pour leur blocage contre les briques.
 - **Multi-balles :** le moteur maintient une liste de balles actives.
+- **Accélération de balle :** le comptage de rebonds utilisé pour accélérer la balle ne prend en compte que les collisions balle/brique.
 - **Vies :** compteur de vies avec animation d'explosion du paddle, reset de manche et relance de partie.
 - **Progression :** niveaux version `3` décrits par matrices JSON dans `src/levels.json`, normalisés par `src/levels.js`.
 - **Types d'ennemis :** chaque niveau porte `enemyType` (`cone`, `cube`, `molecule`, `pyramid`) et l'éditeur permet de le choisir.

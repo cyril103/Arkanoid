@@ -8,9 +8,12 @@ Récréation d'Arkanoid pour navigateur web, développée en HTML5 Canvas avec m
 - Gestion de plusieurs balles simultanées.
 - HUD minimaliste à droite du canvas : `1 UP` et `HIGH SCORE`.
 - Meilleur score conservé en `localStorage` via `arkanoid.highScore`.
+- Le curseur système est masqué au-dessus du canvas pour ne pas gêner la lecture du jeu.
 - Bonus actifs : `catch`, `duplicate`, `expand`, `laser`, `slow`, `life`, `warp`.
 - Une seule pilule bonus peut être active à la fois : collecter une nouvelle pilule annule l'effet précédent.
 - Les effets persistants restent actifs jusqu'à une perte de balle ou un changement de niveau.
+- Les briques argent ne génèrent pas de capsules bonus.
+- La vitesse de balle démarre à `GAME_CONFIG.ball.launchSpeed`, augmente uniquement après les rebonds sur briques, plafonne à `GAME_CONFIG.ball.maxSpeed`, puis revient à la vitesse normale après perte de balle ou changement de niveau.
 - Ennemis animés entrant par les ouvertures des portes du haut, avec un seul type d'ennemi par niveau.
 - Collision ennemis/briques assouplie par un cercle de blocage réduit pour favoriser leur mouvement.
 - Explosion du paddle, transition de matérialisation, séquences laser et élargissement.
@@ -37,6 +40,7 @@ python -m http.server 8080
 ## Commandes
 
 - Souris : déplacement horizontal du paddle.
+- Le curseur est masqué quand il se trouve au-dessus du canvas.
 - Clavier : `Flèche gauche/droite`, `A/D` ou `Q/D`.
 - `Espace` ou clic : lancer la balle.
 - `Espace` ou clic avec `laser` actif : tirer.
@@ -108,6 +112,7 @@ Les sons chargés par défaut depuis `assets/sounds/` couvrent :
 - `level-editor.html` permet d'éditer la grille, de choisir le type d'ennemi du niveau, d'exporter le JSON et d'appliquer un override local relu ensuite par le jeu.
 
 - Les briques standards valent 100 points.
-- Les briques argent résistent à deux impacts et jouent une animation sur le premier.
+- Les briques argent résistent à deux impacts, jouent une animation sur le premier et ne donnent pas de capsule bonus.
 - Les briques or sont indestructibles.
+- Seuls les rebonds contre les briques augmentent progressivement la vitesse de balle, dans la limite de `GAME_CONFIG.ball.maxSpeed`.
 - Finir le dernier niveau relance le cycle au niveau 1.

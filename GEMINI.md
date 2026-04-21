@@ -8,9 +8,12 @@ Jeu Arkanoid pour navigateur web, basé sur HTML5 Canvas et modules ES. Le proje
 - HUD minimaliste à droite du canvas : `1 UP` et `HIGH SCORE`.
 - Meilleur score sauvegardé localement dans `localStorage` (`arkanoid.highScore`).
 - Police arcade du HUD chargée depuis `assets/fonts/emulogic.ttf`.
+- Curseur système masqué au-dessus du canvas de jeu.
 - Bonus jouables : `catch`, `duplicate`, `expand`, `laser`, `slow`, `life`, `warp`.
 - Bonus non cumulables : une pilule remplace l'effet persistant précédent.
 - Effets `catch`, `expand`, `laser` et `slow` sans timer ; ils cessent à la perte de balle ou au changement de niveau.
+- La balle accélère uniquement après les rebonds contre les briques, jusqu'à `GAME_CONFIG.ball.maxSpeed`, puis revient à la vitesse normale après perte de balle ou changement de niveau.
+- Les briques argent ne donnent pas de capsule bonus.
 - Ennemis animés avec portes d'entrée en haut de l'aire de jeu et type choisi par niveau.
 - Sons chargés depuis `assets/sounds/`.
 - Explosion du paddle et rematérialisation déjà intégrées.
@@ -35,6 +38,8 @@ Jeu Arkanoid pour navigateur web, basé sur HTML5 Canvas et modules ES. Le proje
 
 ## 5. Points d'attention
 - La brique argent utilise `brick_silver.png` puis l'animation `brick_silver_1..10`.
+- La brique argent est exclue du tirage de capsules bonus.
+- Le comptage des rebonds pour l'accélération de balle ne prend en compte que les collisions balle/brique.
 - L'activation laser joue `paddle_laser_*` puis maintient la dernière frame pendant l'effet.
 - La perte d'une vie ou le changement de niveau remet le paddle à l'état normal.
 - Le cycle de niveaux repart au début après le dernier niveau défini.

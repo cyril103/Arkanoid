@@ -746,7 +746,7 @@ export class Game {
   }
 
   maybeSpawnPowerUp(brick) {
-    if (brick.indestructible || Math.random() > GAME_CONFIG.powerUps.spawnChance) {
+    if (brick.indestructible || brick.type === "hard" || Math.random() > GAME_CONFIG.powerUps.spawnChance) {
       return;
     }
 

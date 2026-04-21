@@ -80,7 +80,7 @@ export const GAME_CONFIG = Object.freeze({
     height: 19,
     fallSpeed: 120,
     animationFps: 10,
-    spawnChance: 0.50,
+    spawnChance: 0.15,
     slowSpeedFactor: 0.74
   },
   laser: {

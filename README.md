@@ -6,8 +6,10 @@ Récréation d'Arkanoid pour navigateur web, développée en HTML5 Canvas avec m
 
 - Rendu nominal sur sprites PNG, sans dépendre des placeholders SVG.
 - Gestion de plusieurs balles simultanées.
-- HUD avec score, vies, niveau, statut et effets temporaires.
+- HUD avec score, vies, niveau, statut et effet actif.
 - Bonus actifs : `catch`, `duplicate`, `expand`, `laser`, `slow`, `life`, `warp`.
+- Une seule pilule bonus peut être active à la fois : collecter une nouvelle pilule annule l'effet précédent.
+- Les effets persistants restent actifs jusqu'à une perte de balle ou un changement de niveau.
 - Ennemis animés entrant par les portes du haut, avec un seul type d'ennemi par niveau.
 - Explosion du paddle, transition de matérialisation, séquences laser et élargissement.
 - Trois niveaux actuellement définis dans `src/levels.json`, bouclés en cycle.

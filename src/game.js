@@ -66,7 +66,7 @@ export class Game {
     this.enemyExplosions = [];
     this.enemyDoorAnimations = [];
     this.enemySpawnCooldown = getRandomEnemySpawnDelay();
-    this.clearTimedEffects();
+    this.clearActivePowerUpEffect({ clearLasers: true });
     this.resetBallState();
     this.statusText = "Prêt à lancer";
     this.levelCompleteCooldown = 0;
@@ -168,7 +168,7 @@ export class Game {
     return this.balls.some((ball) => !ball.stuckToPaddle);
   }
 
-  releaseStuckBalls() {
+  releaseStuckBalls({ updateStatus = true } = {}) {
     for (const ball of this.balls) {
       if (!ball.stuckToPaddle) {
         continue;
@@ -178,8 +178,10 @@ export class Game {
       this.applyCurrentBallSpeed(ball);
     }
 
-    this.statusText = "En cours";
-    this.updateHud();
+    if (updateStatus) {
+      this.statusText = "En cours";
+      this.updateHud();
+    }
   }
 
   restartRun(statusText = "Partie relancée") {
@@ -197,7 +199,10 @@ export class Game {
     this.updateHud();
   }
 
-  clearTimedEffects() {
+  clearActivePowerUpEffect({ releaseCaughtBalls = false, clearLasers = false } = {}) {
+    const hadCatch = this.activeEffects.catch > 0;
+    const hadSlow = this.activeEffects.slow > 0;
+
     this.activeEffects.catch = 0;
     this.activeEffects.expand = 0;
     this.activeEffects.laser = 0;
@@ -205,8 +210,25 @@ export class Game {
     this.laserCooldownRemaining = 0;
     this.paddleWidthTransition = null;
     this.paddleLaserTransitionElapsed = 0;
-    this.paddleDestruction = null;
+
+    if (clearLasers) {
+      this.lasers = [];
+    }
+
     this.paddle.setWidth(GAME_CONFIG.paddle.baseWidth);
+    this.syncAttachedBalls();
+
+    if (hadSlow) {
+      for (const ball of this.balls) {
+        if (!ball.stuckToPaddle) {
+          ball.setSpeed(GAME_CONFIG.ball.launchSpeed);
+        }
+      }
+    }
+
+    if (releaseCaughtBalls && hadCatch) {
+      this.releaseStuckBalls({ updateStatus: false });
+    }
   }
 
   resetBallState() {
@@ -221,6 +243,7 @@ export class Game {
 
   handleLostBall() {
     this.lives -= 1;
+    this.clearActivePowerUpEffect({ clearLasers: true });
     this.playSound("paddleExplosion");
     this.paddleDestruction = {
       elapsed: 0
@@ -253,30 +276,7 @@ export class Game {
   }
 
   updateActiveEffects(dt) {
-    if (this.activeEffects.expand > 0) {
-      this.activeEffects.expand = Math.max(0, this.activeEffects.expand - dt);
-      if (this.activeEffects.expand === 0) {
-        this.startPaddleWidthTransition("shrink");
-      }
-    }
-
-    if (this.activeEffects.slow > 0) {
-      this.activeEffects.slow = Math.max(0, this.activeEffects.slow - dt);
-      if (this.activeEffects.slow === 0) {
-        for (const ball of this.balls) {
-          if (!ball.stuckToPaddle) {
-            ball.setSpeed(GAME_CONFIG.ball.launchSpeed);
-          }
-        }
-      }
-    }
-
-    if (this.activeEffects.catch > 0) {
-      this.activeEffects.catch = Math.max(0, this.activeEffects.catch - dt);
-    }
-
     if (this.activeEffects.laser > 0) {
-      this.activeEffects.laser = Math.max(0, this.activeEffects.laser - dt);
       const laserTransitionDuration = getAnimationDuration(this.sprites?.paddleLaser);
       if (this.paddleLaserTransitionElapsed < laserTransitionDuration) {
         this.paddleLaserTransitionElapsed = Math.min(
@@ -618,23 +618,22 @@ export class Game {
 
   applyPowerUp(powerUp) {
     let shouldOverrideStatus = true;
+    this.clearActivePowerUpEffect({ releaseCaughtBalls: true });
 
     switch (powerUp.type) {
       case "catch":
-        this.activeEffects.catch = GAME_CONFIG.powerUps.catchDuration;
+        this.activeEffects.catch = 1;
         break;
       case "duplicate":
         this.spawnDuplicateBalls();
         break;
       case "expand":
-        this.activeEffects.expand = GAME_CONFIG.powerUps.expandDuration;
+        this.activeEffects.expand = 1;
         this.startPaddleWidthTransition("expand");
         break;
       case "laser":
-        if (this.activeEffects.laser <= 0) {
-          this.paddleLaserTransitionElapsed = 0;
-        }
-        this.activeEffects.laser = GAME_CONFIG.powerUps.laserDuration;
+        this.activeEffects.laser = 1;
+        this.paddleLaserTransitionElapsed = 0;
         this.laserCooldownRemaining = 0;
         break;
       case "life":
@@ -642,7 +641,7 @@ export class Game {
         this.playSound("extraLife");
         break;
       case "slow":
-        this.activeEffects.slow = GAME_CONFIG.powerUps.slowDuration;
+        this.activeEffects.slow = 1;
         for (const ball of this.balls) {
           if (!ball.stuckToPaddle) {
             ball.setSpeed(GAME_CONFIG.ball.launchSpeed * GAME_CONFIG.powerUps.slowSpeedFactor);
@@ -670,6 +669,7 @@ export class Game {
   }
 
   scheduleLevelTransition(nextLevelIndex, duration, statusText, reason) {
+    this.clearActivePowerUpEffect({ clearLasers: true });
     this.powerUps = [];
     this.lasers = [];
     this.enemies = [];
@@ -856,25 +856,23 @@ export class Game {
   }
 
   getActiveEffectText() {
-    const labels = [];
-
     if (this.activeEffects.catch > 0) {
-      labels.push(`Capture ${Math.ceil(this.activeEffects.catch)}s`);
+      return "Capture";
     }
 
     if (this.activeEffects.expand > 0) {
-      labels.push(`Extension ${Math.ceil(this.activeEffects.expand)}s`);
+      return "Extension";
     }
 
     if (this.activeEffects.laser > 0) {
-      labels.push(`Laser ${Math.ceil(this.activeEffects.laser)}s`);
+      return "Laser";
     }
 
     if (this.activeEffects.slow > 0) {
-      labels.push(`Ralenti ${Math.ceil(this.activeEffects.slow)}s`);
+      return "Ralenti";
     }
 
-    return labels.join(" | ") || "Aucun";
+    return "Aucun";
   }
 
   updateHud() {

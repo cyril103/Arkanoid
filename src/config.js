@@ -57,6 +57,7 @@ export const GAME_CONFIG = Object.freeze({
     spawnDelayMin: 1,
     spawnDelayMax: 5,
     spawnYOffset: 1,
+    brickCollisionRadiusScale: 0.38,
     doorOpenings: {
       left: {
         x: 80,

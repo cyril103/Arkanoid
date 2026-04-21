@@ -5,11 +5,24 @@ import { loadSprites } from "./sprites.js";
 import { getResolvedSpriteManifest } from "./spriteHooks.js";
 import { clamp, isCircleCollidingWithRect } from "./utils.js";
 
+const HIGH_SCORE_STORAGE_KEY = "arkanoid.highScore";
+
 export class Game {
-  constructor({ canvas, scoreNode, levelNode, statusNode, livesNode, effectNode, sounds = null, levels = [] }) {
+  constructor({
+    canvas,
+    scoreNode,
+    highScoreNode = null,
+    levelNode = null,
+    statusNode = null,
+    livesNode = null,
+    effectNode = null,
+    sounds = null,
+    levels = []
+  }) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.scoreNode = scoreNode;
+    this.highScoreNode = highScoreNode;
     this.levelNode = levelNode;
     this.statusNode = statusNode;
     this.livesNode = livesNode;
@@ -21,6 +34,7 @@ export class Game {
     this.balls = [new Ball()];
     this.levelIndex = 0;
     this.score = 0;
+    this.highScore = loadHighScore();
     this.lives = GAME_CONFIG.lives.initial;
     this.bricks = [];
     this.powerUps = [];
@@ -514,8 +528,9 @@ export class Game {
       return true;
     }
 
+    const brickCollisionCircle = getEnemyBrickCollisionCircle(rect);
     for (const brick of this.bricks) {
-      if (!brick.destroyed && isRectColliding(rect, brick)) {
+      if (!brick.destroyed && isCircleCollidingWithRect(brickCollisionCircle, brick)) {
         return true;
       }
     }
@@ -876,9 +891,26 @@ export class Game {
   }
 
   updateHud() {
-    this.scoreNode.textContent = String(this.score);
-    this.levelNode.textContent = `${this.levelIndex + 1} - ${this.levels[this.levelIndex].name}`;
-    this.statusNode.textContent = this.statusText;
+    if (this.score > this.highScore) {
+      this.highScore = this.score;
+      saveHighScore(this.highScore);
+    }
+
+    if (this.scoreNode) {
+      this.scoreNode.textContent = formatHudScore(this.score);
+    }
+
+    if (this.highScoreNode) {
+      this.highScoreNode.textContent = formatHudScore(this.highScore);
+    }
+
+    if (this.levelNode) {
+      this.levelNode.textContent = `${this.levelIndex + 1} - ${this.levels[this.levelIndex].name}`;
+    }
+
+    if (this.statusNode) {
+      this.statusNode.textContent = this.statusText;
+    }
 
     if (this.livesNode) {
       this.livesNode.textContent = String(this.lives);
@@ -909,7 +941,6 @@ export class Game {
     this.renderLasers();
     this.renderPaddle();
     this.renderBalls();
-    this.renderLevelTitle();
     this.renderLives();
   }
 
@@ -1117,19 +1148,6 @@ export class Game {
     }
   }
 
-  renderLevelTitle() {
-    this.ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
-    this.ctx.font = '600 18px "Trebuchet MS", sans-serif';
-    this.ctx.textAlign = "left";
-    this.ctx.fillText(this.levels[this.levelIndex].name, GAME_CONFIG.playfield.left + 12, 58);
-
-    if (this.hasStuckBalls()) {
-      this.ctx.textAlign = "center";
-      this.ctx.font = '600 20px "Trebuchet MS", sans-serif';
-      this.ctx.fillText("Cliquez ou appuyez sur Espace pour servir", this.canvas.width / 2, this.canvas.height - 72);
-    }
-  }
-
   renderLives() {
     if (!this.sprites?.paddleLife) {
       return;
@@ -1258,6 +1276,36 @@ function buildBricks(layout) {
   return buildBrickPlacements(layout).map((placement) => new Brick(placement));
 }
 
+function formatHudScore(score) {
+  return String(Math.max(0, Math.trunc(score))).padStart(6, "0");
+}
+
+function loadHighScore() {
+  try {
+    if (!globalThis.localStorage) {
+      return 0;
+    }
+
+    const value = Number.parseInt(globalThis.localStorage.getItem(HIGH_SCORE_STORAGE_KEY), 10);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  } catch (error) {
+    console.warn("Meilleur score local indisponible", error);
+    return 0;
+  }
+}
+
+function saveHighScore(score) {
+  try {
+    if (!globalThis.localStorage) {
+      return;
+    }
+
+    globalThis.localStorage.setItem(HIGH_SCORE_STORAGE_KEY, String(Math.max(0, Math.trunc(score))));
+  } catch (error) {
+    console.warn("Sauvegarde du meilleur score indisponible", error);
+  }
+}
+
 function getBrickSpriteKey(brick) {
   if (brick.indestructible) {
     return "brickGold";
@@ -1291,6 +1339,17 @@ function pickWeightedDefinition(library) {
 
 function getRandomEnemySpawnDelay() {
   return randomRange(GAME_CONFIG.enemies.spawnDelayMin, GAME_CONFIG.enemies.spawnDelayMax);
+}
+
+function getEnemyBrickCollisionCircle(enemyRect) {
+  return {
+    x: enemyRect.x + (enemyRect.width / 2),
+    y: enemyRect.y + (enemyRect.height / 2),
+    radius: Math.max(
+      4,
+      Math.min(enemyRect.width, enemyRect.height) * GAME_CONFIG.enemies.brickCollisionRadiusScale
+    )
+  };
 }
 
 function randomRange(min, max) {

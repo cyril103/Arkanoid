@@ -8,10 +8,7 @@ import { createSoundboard } from "./sounds.js";
 async function bootstrap() {
   const canvas = document.getElementById("game-canvas");
   const scoreNode = document.getElementById("score-value");
-  const livesNode = document.getElementById("lives-value");
-  const levelNode = document.getElementById("level-value");
-  const effectNode = document.getElementById("effect-value");
-  const statusNode = document.getElementById("status-value");
+  const highScoreNode = document.getElementById("high-score-value");
   const sounds = createSoundboard(getResolvedSoundManifest());
   const levels = await loadLevels();
 
@@ -21,10 +18,7 @@ async function bootstrap() {
   const game = new Game({
     canvas,
     scoreNode,
-    livesNode,
-    levelNode,
-    effectNode,
-    statusNode,
+    highScoreNode,
     sounds,
     levels
   });
@@ -69,8 +63,8 @@ function openLevelEditor(game) {
 
 bootstrap().catch((error) => {
   console.error("Initialisation impossible", error);
-  const statusNode = document.getElementById("status-value");
-  if (statusNode) {
-    statusNode.textContent = "Erreur d'initialisation";
+  const scoreNode = document.getElementById("score-value");
+  if (scoreNode) {
+    scoreNode.textContent = "ERROR";
   }
 });

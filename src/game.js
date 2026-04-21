@@ -1,6 +1,6 @@
 import { Ball, Brick, Enemy, EnemyExplosion, LaserShot, Paddle, PowerUp } from "./entities.js";
 import { ENEMY_LIBRARY, GAME_CONFIG, POWERUP_LIBRARY } from "./config.js";
-import { buildBrickPlacements } from "./levels.js";
+import { buildBrickPlacements, normalizeEnemyType } from "./levels.js";
 import { loadSprites } from "./sprites.js";
 import { getResolvedSpriteManifest } from "./spriteHooks.js";
 import { clamp, isCircleCollidingWithRect } from "./utils.js";
@@ -426,7 +426,8 @@ export class Game {
   }
 
   spawnEnemy() {
-    const definition = pickWeightedDefinition(ENEMY_LIBRARY);
+    const enemyType = normalizeEnemyType(this.levels[this.levelIndex]?.enemyType);
+    const definition = ENEMY_LIBRARY[enemyType];
     if (!definition) {
       return;
     }

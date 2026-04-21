@@ -1,6 +1,7 @@
-import { GAME_CONFIG } from "./config.js";
+import { ENEMY_LIBRARY, GAME_CONFIG } from "./config.js";
 import {
   COMMON_BRICK_TOKENS,
+  DEFAULT_LEVEL_ENEMY_TYPE,
   LEVEL_CELL_LIBRARY,
   buildBrickPlacements,
   clearLevelOverrides,
@@ -8,6 +9,7 @@ import {
   getLevelColumns,
   getLevelOverrides,
   loadLevels,
+  normalizeEnemyType,
   normalizeLevelCollection,
   resizeLayout,
   serializeLevels,
@@ -53,6 +55,7 @@ const elements = {
   levelSelect: document.getElementById("level-select"),
   levelIdInput: document.getElementById("level-id-input"),
   levelNameInput: document.getElementById("level-name-input"),
+  levelEnemySelect: document.getElementById("level-enemy-select"),
   rowsInput: document.getElementById("rows-input"),
   columnsInput: document.getElementById("columns-input"),
   gridSizeLabel: document.getElementById("grid-size-label"),
@@ -115,6 +118,12 @@ function bindEvents() {
     renderJson();
   });
 
+  elements.levelEnemySelect.addEventListener("change", () => {
+    getCurrentLevel().enemyType = normalizeEnemyType(elements.levelEnemySelect.value);
+    renderJson();
+    setStatus("Type d'ennemi du niveau mis à jour");
+  });
+
   elements.newLevelButton.addEventListener("click", () => {
     const currentLevel = getCurrentLevel();
     const rows = currentLevel?.layout.length ?? 5;
@@ -123,6 +132,7 @@ function bindEvents() {
     const level = {
       id: createUniqueId("new-level"),
       name: `Nouveau niveau ${state.levels.length + 1}`,
+      enemyType: currentLevel?.enemyType ?? DEFAULT_LEVEL_ENEMY_TYPE,
       layout: createEmptyLayout(rows, columns)
     };
 
@@ -137,6 +147,7 @@ function bindEvents() {
     const copy = {
       id: createUniqueId(`${currentLevel.id}-copy`),
       name: `${currentLevel.name} copie`,
+      enemyType: currentLevel.enemyType,
       layout: currentLevel.layout.map((row) => [...row])
     };
 
@@ -151,6 +162,7 @@ function bindEvents() {
       state.levels[0] = {
         id: "level-1",
         name: "Niveau 1",
+        enemyType: DEFAULT_LEVEL_ENEMY_TYPE,
         layout: createEmptyLayout(5, 12)
       };
       state.selectedLevelIndex = 0;
@@ -281,6 +293,7 @@ function syncDerivedState() {
   const currentLevel = getCurrentLevel();
   currentLevel.id = slugify(currentLevel.id, state.selectedLevelIndex);
   currentLevel.name = currentLevel.name?.trim() || `Niveau ${state.selectedLevelIndex + 1}`;
+  currentLevel.enemyType = normalizeEnemyType(currentLevel.enemyType);
 }
 
 function renderSourceBadge() {
@@ -307,6 +320,14 @@ function renderFields() {
 
   elements.levelIdInput.value = currentLevel.id;
   elements.levelNameInput.value = currentLevel.name;
+  elements.levelEnemySelect.innerHTML = "";
+  for (const [type, definition] of Object.entries(ENEMY_LIBRARY)) {
+    const option = document.createElement("option");
+    option.value = type;
+    option.textContent = definition.label ?? type;
+    option.selected = type === currentLevel.enemyType;
+    elements.levelEnemySelect.append(option);
+  }
   elements.rowsInput.value = String(rows);
   elements.columnsInput.value = String(columns);
   elements.gridSizeLabel.textContent = `${rows} x ${columns}`;

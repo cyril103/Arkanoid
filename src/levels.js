@@ -1,7 +1,9 @@
-import { GAME_CONFIG } from "./config.js";
+import { ENEMY_LIBRARY, GAME_CONFIG } from "./config.js";
 
 export const LEVEL_FILE_VERSION = 2;
 export const LEVEL_STORAGE_KEY = "arkanoid.customLevels";
+export const DEFAULT_LEVEL_ENEMY_TYPE = "cone";
+export const LEVEL_ENEMY_TYPES = Object.freeze(Object.keys(ENEMY_LIBRARY));
 
 export const COMMON_BRICK_TOKENS = Object.freeze([
   "blue",
@@ -112,6 +114,7 @@ const FALLBACK_LEVEL_DATA = Object.freeze({
     Object.freeze({
       id: "opening-volley",
       name: "Ouverture",
+      enemyType: "cone",
       layout: Object.freeze([
         Object.freeze([null, null, "blue", "blue", "silver", "silver", "silver", "silver", "blue", "blue", null, null]),
         Object.freeze([null, "orange", "orange", "orange", "orange", "gold", "gold", "orange", "orange", "orange", "orange", null]),
@@ -123,6 +126,7 @@ const FALLBACK_LEVEL_DATA = Object.freeze({
     Object.freeze({
       id: "golden-wall",
       name: "Mur d'or",
+      enemyType: "cube",
       layout: Object.freeze([
         Object.freeze(["blue", "blue", "silver", "silver", "gold", "gold", "gold", "gold", "silver", "silver", "blue", "blue"]),
         Object.freeze(["orange", "silver", "silver", "orange", "orange", "orange", "orange", "orange", "orange", "silver", "silver", "orange"]),
@@ -172,6 +176,11 @@ export function normalizeLayout(layout = []) {
   });
 
   return normalizedRows.length > 0 ? normalizedRows : createEmptyLayout(1, 1);
+}
+
+export function normalizeEnemyType(value) {
+  const type = String(value ?? "").trim().toLowerCase();
+  return LEVEL_ENEMY_TYPES.includes(type) ? type : DEFAULT_LEVEL_ENEMY_TYPE;
 }
 
 export function normalizeLevelCollection(source) {
@@ -297,6 +306,7 @@ function normalizeLevel(level, index) {
   return {
     id: sanitizeId(level.id, index),
     name: sanitizeName(level.name, fallbackName),
+    enemyType: normalizeEnemyType(level.enemyType ?? level.enemy ?? level.enemyKind),
     layout: normalizeLayout(level.layout)
   };
 }
@@ -428,6 +438,7 @@ function cloneLevels(levels) {
   return levels.map((level) => ({
     id: level.id,
     name: level.name,
+    enemyType: normalizeEnemyType(level.enemyType),
     layout: level.layout.map((row) => [...row])
   }));
 }

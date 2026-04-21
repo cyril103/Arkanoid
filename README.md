@@ -8,9 +8,9 @@ Récréation d'Arkanoid pour navigateur web, développée en HTML5 Canvas avec m
 - Gestion de plusieurs balles simultanées.
 - HUD avec score, vies, niveau, statut et effets temporaires.
 - Bonus actifs : `catch`, `duplicate`, `expand`, `laser`, `slow`, `life`, `warp`.
-- Ennemis animés entrant par les portes du haut.
+- Ennemis animés entrant par les portes du haut, avec un seul type d'ennemi par niveau.
 - Explosion du paddle, transition de matérialisation, séquences laser et élargissement.
-- Deux niveaux actuellement définis dans `src/levels.json`, bouclés en cycle.
+- Trois niveaux actuellement définis dans `src/levels.json`, bouclés en cycle.
 - Un éditeur visuel est disponible dans `level-editor.html`.
 
 ## Démarrage
@@ -94,10 +94,11 @@ Les sons chargés par défaut depuis `assets/sounds/` couvrent :
 
 - Les niveaux sont chargés depuis `src/levels.json`.
 - Le format recommandé est un objet JSON avec `version` et `levels`.
-- Chaque niveau contient `id`, `name` et `layout`.
+- Chaque niveau contient `id`, `name`, `enemyType` et `layout`.
+- `enemyType` accepte `cone`, `cube`, `molecule` ou `pyramid`.
 - Les cellules de `layout` utilisent `null`, `blue`, `orange`, `green`, `red`, `white`, `yellow`, `pink`, `cyan`, `silver` ou `gold`.
 - Le chargeur conserve une compatibilité avec l'ancien format numérique `0/1/2/3`.
-- `level-editor.html` permet d'éditer la grille, d'exporter le JSON et d'appliquer un override local relu ensuite par le jeu.
+- `level-editor.html` permet d'éditer la grille, de choisir le type d'ennemi du niveau, d'exporter le JSON et d'appliquer un override local relu ensuite par le jeu.
 
 - Les briques standards valent 100 points.
 - Les briques argent résistent à deux impacts et jouent une animation sur le premier.

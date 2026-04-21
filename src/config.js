@@ -53,7 +53,7 @@ export const GAME_CONFIG = Object.freeze({
     hardHitAnimationFps: 20
   },
   enemies: {
-    maxActive: 2,
+    maxActive: 3,
     spawnDelayMin: 8,
     spawnDelayMax: 14,
     spawnInset: 34,
@@ -137,6 +137,7 @@ export const POWERUP_LIBRARY = Object.freeze({
 export const ENEMY_LIBRARY = Object.freeze({
   cone: {
     type: "cone",
+    label: "Cone",
     spriteKey: "enemyCone",
     width: 34,
     height: 38,
@@ -144,6 +145,7 @@ export const ENEMY_LIBRARY = Object.freeze({
   },
   cube: {
     type: "cube",
+    label: "Cube",
     spriteKey: "enemyCube",
     width: 36,
     height: 36,
@@ -151,6 +153,7 @@ export const ENEMY_LIBRARY = Object.freeze({
   },
   molecule: {
     type: "molecule",
+    label: "Molecule",
     spriteKey: "enemyMolecule",
     width: 38,
     height: 35,
@@ -158,6 +161,7 @@ export const ENEMY_LIBRARY = Object.freeze({
   },
   pyramid: {
     type: "pyramid",
+    label: "Pyramide",
     spriteKey: "enemyPyramid",
     width: 40,
     height: 27,

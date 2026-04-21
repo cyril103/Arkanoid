@@ -4,6 +4,7 @@
     {
       "id": "opening-volley",
       "name": "Ouverture",
+      "enemyType": "cone",
       "layout": [
         [
           null,
@@ -145,6 +146,7 @@
     {
       "id": "golden-wall",
       "name": "Mur d'or",
+      "enemyType": "cube",
       "layout": [
         [
           null,
@@ -376,6 +378,7 @@
     {
       "id": "level-3",
       "name": "niveau_3",
+      "enemyType": "molecule",
       "layout": [
         [
           null,

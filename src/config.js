@@ -56,8 +56,17 @@ export const GAME_CONFIG = Object.freeze({
     maxActive: 3,
     spawnDelayMin: 8,
     spawnDelayMax: 14,
-    spawnInset: 34,
-    spawnYOffset: 10,
+    spawnYOffset: 1,
+    doorOpenings: {
+      left: {
+        x: 80,
+        width: 90
+      },
+      right: {
+        x: 386,
+        width: 90
+      }
+    },
     speedMin: 68,
     speedMax: 104,
     decisionDelayMin: 0.55,

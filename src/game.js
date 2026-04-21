@@ -432,10 +432,9 @@ export class Game {
       return;
     }
 
-    const y = GAME_CONFIG.playfield.top + GAME_CONFIG.enemies.spawnYOffset;
     const enemy = new Enemy({
-      x: GAME_CONFIG.playfield.left + GAME_CONFIG.enemies.spawnInset,
-      y,
+      x: 0,
+      y: 0,
       definition,
       speed: randomRange(GAME_CONFIG.enemies.speedMin, GAME_CONFIG.enemies.speedMax)
     });
@@ -542,9 +541,13 @@ export class Game {
   }
 
   placeEnemyAtTopDoor(enemy, side = Math.random() < 0.5 ? "left" : "right") {
-    enemy.x = side === "left"
-      ? GAME_CONFIG.playfield.left + GAME_CONFIG.enemies.spawnInset
-      : GAME_CONFIG.playfield.right - GAME_CONFIG.enemies.spawnInset - enemy.width;
+    const opening = GAME_CONFIG.enemies.doorOpenings[side] ?? GAME_CONFIG.enemies.doorOpenings.left;
+    const openingCenterX = GAME_CONFIG.playfield.left + opening.x + (opening.width / 2);
+    enemy.x = clamp(
+      openingCenterX - (enemy.width / 2),
+      GAME_CONFIG.playfield.left,
+      GAME_CONFIG.playfield.right - enemy.width
+    );
     enemy.y = GAME_CONFIG.playfield.top + GAME_CONFIG.enemies.spawnYOffset;
     enemy.elapsed = 0;
 

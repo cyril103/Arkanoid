@@ -7,6 +7,8 @@ import { createSoundboard } from "./sounds.js";
 
 async function bootstrap() {
   const canvas = document.getElementById("game-canvas");
+  const startMenu = document.getElementById("start-menu");
+  const startButton = document.getElementById("start-game-button");
   const scoreNode = document.getElementById("score-value");
   const highScoreNode = document.getElementById("high-score-value");
   const sounds = createSoundboard(getResolvedSoundManifest());
@@ -23,9 +25,12 @@ async function bootstrap() {
     levels
   });
 
-  const input = createInputController(canvas);
   sounds.installUnlockHandlers();
   await game.init();
+  await waitForStartMenu({ startMenu, startButton });
+
+  const input = createInputController(canvas);
+  canvas.focus();
 
   let previousTime = performance.now();
 
@@ -48,6 +53,34 @@ async function bootstrap() {
   };
 
   window.requestAnimationFrame(frame);
+}
+
+function waitForStartMenu({ startMenu, startButton }) {
+  if (!startMenu || !startButton) {
+    return Promise.resolve();
+  }
+
+  startButton.focus();
+
+  return new Promise((resolve) => {
+    const start = () => {
+      startMenu.classList.add("is-hidden");
+      startMenu.setAttribute("aria-hidden", "true");
+      startButton.removeEventListener("click", start);
+      window.removeEventListener("keydown", onKeyDown);
+      resolve();
+    };
+
+    const onKeyDown = (event) => {
+      if (event.code === "Enter" || event.code === "Space") {
+        event.preventDefault();
+        start();
+      }
+    };
+
+    startButton.addEventListener("click", start);
+    window.addEventListener("keydown", onKeyDown);
+  });
 }
 
 function openLevelEditor(game) {

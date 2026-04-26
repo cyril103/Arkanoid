@@ -10,6 +10,15 @@
   <main class="app-shell">
     <section class="arcade-stage">
       <section class="game-frame">
+        <div id="start-menu" class="start-menu" role="dialog" aria-labelledby="start-menu-title" aria-describedby="start-menu-description">
+          <div class="start-menu__panel">
+            <p class="start-menu__eyebrow">Insert coin</p>
+            <h1 id="start-menu-title">ARKANOID LEGACY</h1>
+            <p id="start-menu-description">Détruisez toutes les briques, récupérez les bonus et survivez aux ennemis.</p>
+            <button id="start-game-button" class="start-menu__button" type="button">Jouer</button>
+            <p class="start-menu__hint">Cliquez sur Jouer ou appuyez sur Entrée pour commencer.</p>
+          </div>
+        </div>
         <canvas
           id="game-canvas"
           width="800"

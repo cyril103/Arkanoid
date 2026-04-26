@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "serve": "python -m http.server 8080"
+    "serve": "python -m http.server 8080",
+    "test": "node tests/menu-screen.test.mjs"
   }
 }

@@ -180,10 +180,43 @@ body::before {
   width: 100%;
   height: auto;
   cursor: none;
+  touch-action: none;
+  user-select: none;
   border: 1px solid rgba(47, 243, 255, 0.28);
   border-radius: 4px;
   background: linear-gradient(180deg, rgba(10, 19, 43, 0.96), rgba(5, 8, 20, 0.98));
   box-shadow: 0 0 22px rgba(47, 243, 255, 0.18);
+}
+
+.mobile-controls {
+  display: none;
+  grid-template-columns: 1fr minmax(124px, 1.25fr) 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.mobile-controls__button {
+  min-height: 58px;
+  border: 2px solid rgba(47, 243, 255, 0.45);
+  border-radius: 12px;
+  background: rgba(7, 9, 17, 0.92);
+  color: var(--text-main);
+  touch-action: manipulation;
+  user-select: none;
+  font-family: "Emulogic", "Courier New", monospace;
+  font-size: 1rem;
+  box-shadow: inset 0 0 18px rgba(47, 243, 255, 0.1);
+}
+
+.mobile-controls__button--primary {
+  color: var(--score-yellow);
+  border-color: rgba(255, 228, 92, 0.65);
+  font-size: 0.62rem;
+}
+
+.mobile-controls__button:active {
+  transform: translateY(1px);
+  background: rgba(47, 243, 255, 0.18);
 }
 
 .hud {
@@ -291,8 +324,20 @@ code {
     padding: 10px;
   }
 
+  .start-menu {
+    padding: 14px;
+  }
+
+  .start-menu__panel {
+    padding: 22px 16px;
+  }
+
   .game-frame {
     padding: 8px;
+  }
+
+  .mobile-controls {
+    display: grid;
   }
 
   .hud {

@@ -9,6 +9,7 @@ async function bootstrap() {
   const canvas = document.getElementById("game-canvas");
   const startMenu = document.getElementById("start-menu");
   const startButton = document.getElementById("start-game-button");
+  const mobileControls = document.querySelector(".mobile-controls");
   const scoreNode = document.getElementById("score-value");
   const highScoreNode = document.getElementById("high-score-value");
   const sounds = createSoundboard(getResolvedSoundManifest());
@@ -29,7 +30,7 @@ async function bootstrap() {
   await game.init();
   await waitForStartMenu({ startMenu, startButton });
 
-  const input = createInputController(canvas);
+  const input = createInputController(canvas, { mobileControls });
   canvas.focus();
 
   let previousTime = performance.now();

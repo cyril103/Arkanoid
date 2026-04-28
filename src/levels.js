@@ -1,9 +1,11 @@
-import { ENEMY_LIBRARY, GAME_CONFIG } from "./config.js";
+import { ENEMY_LIBRARY, GAME_CONFIG, LEVEL_BACKGROUND_LIBRARY } from "./config.js";
 
-export const LEVEL_FILE_VERSION = 3;
+export const LEVEL_FILE_VERSION = 4;
 export const LEVEL_STORAGE_KEY = "arkanoid.customLevels";
 export const DEFAULT_LEVEL_ENEMY_TYPE = "cone";
+export const DEFAULT_LEVEL_BACKGROUND = "blue-panel";
 export const LEVEL_ENEMY_TYPES = Object.freeze(Object.keys(ENEMY_LIBRARY));
+export const LEVEL_BACKGROUNDS = Object.freeze(Object.keys(LEVEL_BACKGROUND_LIBRARY));
 
 export const COMMON_BRICK_TOKENS = Object.freeze([
   "blue",
@@ -115,6 +117,7 @@ const FALLBACK_LEVEL_DATA = Object.freeze({
       id: "opening-volley",
       name: "Ouverture",
       enemyType: "cone",
+      background: "blue-panel",
       layout: Object.freeze([
         Object.freeze([null, null, "blue", "blue", "silver", "silver", "silver", "silver", "blue", "blue", null, null]),
         Object.freeze([null, "orange", "orange", "orange", "orange", "gold", "gold", "orange", "orange", "orange", "orange", null]),
@@ -127,6 +130,7 @@ const FALLBACK_LEVEL_DATA = Object.freeze({
       id: "golden-wall",
       name: "Mur d'or",
       enemyType: "cube",
+      background: "red-mechanic",
       layout: Object.freeze([
         Object.freeze(["blue", "blue", "silver", "silver", "gold", "gold", "gold", "gold", "silver", "silver", "blue", "blue"]),
         Object.freeze(["orange", "silver", "silver", "orange", "orange", "orange", "orange", "orange", "orange", "silver", "silver", "orange"]),
@@ -181,6 +185,11 @@ export function normalizeLayout(layout = []) {
 export function normalizeEnemyType(value) {
   const type = String(value ?? "").trim().toLowerCase();
   return LEVEL_ENEMY_TYPES.includes(type) ? type : DEFAULT_LEVEL_ENEMY_TYPE;
+}
+
+export function normalizeLevelBackground(value) {
+  const background = String(value ?? "").trim().toLowerCase();
+  return LEVEL_BACKGROUNDS.includes(background) ? background : DEFAULT_LEVEL_BACKGROUND;
 }
 
 export function normalizeLevelCollection(source) {
@@ -246,7 +255,7 @@ export async function loadLevels({ forceRefresh = false, ignoreOverrides = false
     if (overrideSource) {
       const baseLevels = await loadBaseLevels(forceRefresh);
       const overrides = normalizeLevelCollection(
-        applyBaseEnemyTypeDefaults(overrideSource, baseLevels.levels)
+        applyBaseLevelDefaults(overrideSource, baseLevels.levels)
       );
       return cloneLevels(overrides.levels);
     }
@@ -275,11 +284,14 @@ function getLevelOverrideSource() {
   }
 }
 
-function applyBaseEnemyTypeDefaults(source, baseLevels) {
+function applyBaseLevelDefaults(source, baseLevels) {
   const payload = Array.isArray(source) ? { levels: source } : (source ?? {});
   const levels = Array.isArray(payload.levels) ? payload.levels : [];
+  const version = clampInteger(payload.version ?? 1, 1, 9999);
   const baseEnemyTypesById = new Map(baseLevels.map((level) => [level.id, level.enemyType]));
-  const shouldMigrateEnemyTypes = clampInteger(payload.version ?? 1, 1, 9999) < LEVEL_FILE_VERSION;
+  const baseBackgroundsById = new Map(baseLevels.map((level) => [level.id, level.background]));
+  const shouldMigrateEnemyTypes = version < 3;
+  const shouldMigrateBackgrounds = version < 4;
 
   return {
     ...payload,
@@ -288,13 +300,24 @@ function applyBaseEnemyTypeDefaults(source, baseLevels) {
         return level;
       }
 
-      if (!shouldMigrateEnemyTypes && hasLevelEnemyType(level)) {
-        return level;
+      const levelId = sanitizeId(level.id, index);
+      const updates = {};
+
+      if ((shouldMigrateEnemyTypes || !hasLevelEnemyType(level)) && !hasLevelEnemyType(level)) {
+        const enemyType = baseEnemyTypesById.get(levelId) ?? baseLevels[index]?.enemyType;
+        if (enemyType) {
+          updates.enemyType = enemyType;
+        }
       }
 
-      const levelId = sanitizeId(level.id, index);
-      const enemyType = baseEnemyTypesById.get(levelId) ?? baseLevels[index]?.enemyType;
-      return enemyType ? { ...level, enemyType } : level;
+      if ((shouldMigrateBackgrounds || !hasLevelBackground(level)) && !hasLevelBackground(level)) {
+        const background = baseBackgroundsById.get(levelId) ?? baseLevels[index]?.background;
+        if (background) {
+          updates.background = background;
+        }
+      }
+
+      return Object.keys(updates).length > 0 ? { ...level, ...updates } : level;
     })
   };
 }
@@ -303,6 +326,10 @@ function hasLevelEnemyType(level) {
   return [level.enemyType, level.enemy, level.enemyKind].some((value) => (
     String(value ?? "").trim() !== ""
   ));
+}
+
+function hasLevelBackground(level) {
+  return String(level.background ?? "").trim() !== "";
 }
 
 export function buildBrickPlacements(layout) {
@@ -342,6 +369,7 @@ function normalizeLevel(level, index) {
     id: sanitizeId(level.id, index),
     name: sanitizeName(level.name, fallbackName),
     enemyType: normalizeEnemyType(level.enemyType ?? level.enemy ?? level.enemyKind),
+    background: normalizeLevelBackground(level.background),
     layout: normalizeLayout(level.layout)
   };
 }
@@ -474,6 +502,7 @@ function cloneLevels(levels) {
     id: level.id,
     name: level.name,
     enemyType: normalizeEnemyType(level.enemyType),
+    background: normalizeLevelBackground(level.background),
     layout: level.layout.map((row) => [...row])
   }));
 }

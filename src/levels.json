@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "levels": [
     {
       "id": "opening-volley",
@@ -141,7 +141,8 @@
           "pink",
           "pink"
         ]
-      ]
+      ],
+      "background": "blue-panel"
     },
     {
       "id": "level4",
@@ -418,7 +419,8 @@
           null,
           null
         ]
-      ]
+      ],
+      "background": "green-panel"
     },
     {
       "id": "golden-wall",
@@ -650,7 +652,8 @@
           "silver",
           "red"
         ]
-      ]
+      ],
+      "background": "blue-circuit"
     },
     {
       "id": "level-3",
@@ -912,7 +915,8 @@
           "cyan",
           "cyan"
         ]
-      ]
+      ],
+      "background": "red-mechanic"
     },
     {
       "id": "level5",
@@ -1174,7 +1178,8 @@
           "white",
           null
         ]
-      ]
+      ],
+      "background": "blue-panel"
     },
     {
       "id": "levelbonus",
@@ -1496,7 +1501,8 @@
           null,
           null
         ]
-      ]
+      ],
+      "background": "green-panel"
     },
     {
       "id": "level7",
@@ -1893,7 +1899,8 @@
           null,
           null
         ]
-      ]
+      ],
+      "background": "blue-circuit"
     }
   ]
 }

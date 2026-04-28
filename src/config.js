@@ -97,6 +97,41 @@ export const GAME_CONFIG = Object.freeze({
   }
 });
 
+export const LEVEL_BACKGROUND_LIBRARY = Object.freeze({
+  "blue-panel": {
+    id: "blue-panel",
+    label: "Panneau bleu",
+    colors: ["#00001f", "#000066", "#1010b8", "#1a2be0"],
+    accent: "#404cff",
+    secondaryAccent: "#8aa2ff",
+    pattern: "blue-texture"
+  },
+  "green-panel": {
+    id: "green-panel",
+    label: "Panneau vert",
+    colors: ["#002800", "#005008", "#007810", "#24a534"],
+    accent: "#42d14a",
+    secondaryAccent: "#9be67a",
+    pattern: "green-grain"
+  },
+  "blue-circuit": {
+    id: "blue-circuit",
+    label: "Circuit bleu",
+    colors: ["#000018", "#001044", "#123c86", "#5d92e8"],
+    accent: "#2f66c8",
+    secondaryAccent: "#7fb4ff",
+    pattern: "blue-circuit"
+  },
+  "red-mechanic": {
+    id: "red-mechanic",
+    label: "Mécanique rouge",
+    colors: ["#262b2a", "#414b48", "#68736e", "#9a2a2a"],
+    accent: "#8f2727",
+    secondaryAccent: "#d34836",
+    pattern: "red-mechanic"
+  }
+});
+
 export const POWERUP_LIBRARY = Object.freeze({
   catch: {
     type: "catch",

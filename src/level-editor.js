@@ -1,6 +1,7 @@
-import { ENEMY_LIBRARY, GAME_CONFIG } from "./config.js";
+import { ENEMY_LIBRARY, GAME_CONFIG, LEVEL_BACKGROUND_LIBRARY } from "./config.js";
 import {
   COMMON_BRICK_TOKENS,
+  DEFAULT_LEVEL_BACKGROUND,
   DEFAULT_LEVEL_ENEMY_TYPE,
   LEVEL_CELL_LIBRARY,
   buildBrickPlacements,
@@ -10,6 +11,7 @@ import {
   getLevelOverrides,
   loadLevels,
   normalizeEnemyType,
+  normalizeLevelBackground,
   normalizeLevelCollection,
   resizeLayout,
   serializeLevels,
@@ -56,6 +58,7 @@ const elements = {
   levelIdInput: document.getElementById("level-id-input"),
   levelNameInput: document.getElementById("level-name-input"),
   levelEnemySelect: document.getElementById("level-enemy-select"),
+  levelBackgroundSelect: document.getElementById("level-background-select"),
   rowsInput: document.getElementById("rows-input"),
   columnsInput: document.getElementById("columns-input"),
   gridSizeLabel: document.getElementById("grid-size-label"),
@@ -124,6 +127,13 @@ function bindEvents() {
     setStatus("Type d'ennemi du niveau mis à jour");
   });
 
+  elements.levelBackgroundSelect.addEventListener("change", () => {
+    getCurrentLevel().background = normalizeLevelBackground(elements.levelBackgroundSelect.value);
+    renderPreview();
+    renderJson();
+    setStatus("Fond du niveau mis à jour");
+  });
+
   elements.newLevelButton.addEventListener("click", () => {
     const currentLevel = getCurrentLevel();
     const rows = currentLevel?.layout.length ?? 5;
@@ -133,6 +143,7 @@ function bindEvents() {
       id: createUniqueId("new-level"),
       name: `Nouveau niveau ${state.levels.length + 1}`,
       enemyType: currentLevel?.enemyType ?? DEFAULT_LEVEL_ENEMY_TYPE,
+      background: DEFAULT_LEVEL_BACKGROUND,
       layout: createEmptyLayout(rows, columns)
     };
 
@@ -148,6 +159,7 @@ function bindEvents() {
       id: createUniqueId(`${currentLevel.id}-copy`),
       name: `${currentLevel.name} copie`,
       enemyType: currentLevel.enemyType,
+      background: currentLevel.background,
       layout: currentLevel.layout.map((row) => [...row])
     };
 
@@ -163,6 +175,7 @@ function bindEvents() {
         id: "level-1",
         name: "Niveau 1",
         enemyType: DEFAULT_LEVEL_ENEMY_TYPE,
+        background: DEFAULT_LEVEL_BACKGROUND,
         layout: createEmptyLayout(5, 12)
       };
       state.selectedLevelIndex = 0;
@@ -294,6 +307,7 @@ function syncDerivedState() {
   currentLevel.id = slugify(currentLevel.id, state.selectedLevelIndex);
   currentLevel.name = currentLevel.name?.trim() || `Niveau ${state.selectedLevelIndex + 1}`;
   currentLevel.enemyType = normalizeEnemyType(currentLevel.enemyType);
+  currentLevel.background = normalizeLevelBackground(currentLevel.background);
 }
 
 function renderSourceBadge() {
@@ -327,6 +341,14 @@ function renderFields() {
     option.textContent = definition.label ?? type;
     option.selected = type === currentLevel.enemyType;
     elements.levelEnemySelect.append(option);
+  }
+  elements.levelBackgroundSelect.innerHTML = "";
+  for (const [backgroundId, definition] of Object.entries(LEVEL_BACKGROUND_LIBRARY)) {
+    const option = document.createElement("option");
+    option.value = backgroundId;
+    option.textContent = definition.label ?? backgroundId;
+    option.selected = backgroundId === currentLevel.background;
+    elements.levelBackgroundSelect.append(option);
   }
   elements.rowsInput.value = String(rows);
   elements.columnsInput.value = String(columns);
@@ -424,6 +446,7 @@ function renderPreview() {
     GAME_CONFIG.playfield.width,
     GAME_CONFIG.frame.height - GAME_CONFIG.frame.topThickness
   );
+  renderPreviewBackground(ctx, currentLevel.background);
 
   drawSpriteOrFallback(ctx, state.previewSprites?.frameTop, {
     x: GAME_CONFIG.playfield.left,
@@ -469,6 +492,167 @@ function drawSpriteOrFallback(ctx, sprite, bounds, fallbackColor) {
 
   ctx.fillStyle = fallbackColor;
   ctx.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
+}
+
+function renderPreviewBackground(ctx, backgroundId) {
+  const background = LEVEL_BACKGROUND_LIBRARY[normalizeLevelBackground(backgroundId)] ?? LEVEL_BACKGROUND_LIBRARY[DEFAULT_LEVEL_BACKGROUND];
+  const left = GAME_CONFIG.playfield.left;
+  const top = GAME_CONFIG.playfield.top;
+  const width = GAME_CONFIG.playfield.width;
+  const height = GAME_CONFIG.frame.height - GAME_CONFIG.frame.topThickness;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(left, top, width, height);
+  ctx.clip();
+  ctx.imageSmoothingEnabled = false;
+
+  switch (background.pattern) {
+    case "green-grain":
+      drawPreviewGreenGrain(ctx, background, left, top, width, height);
+      break;
+    case "blue-circuit":
+      drawPreviewBlueCircuit(ctx, background, left, top, width, height);
+      break;
+    case "red-mechanic":
+      drawPreviewRedMechanic(ctx, background, left, top, width, height);
+      break;
+    case "blue-texture":
+    default:
+      drawPreviewBlueTexture(ctx, background, left, top, width, height);
+      break;
+  }
+
+  ctx.restore();
+}
+
+function drawPreviewBlueTexture(ctx, background, left, top, width, height) {
+  const step = 4;
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const wave = Math.sin((x + y * 1.35) * 0.075) + Math.sin((x * 0.36 - y * 0.18) * 0.11) * 0.55;
+      const noise = pseudoNoise2D(x >> 2, y >> 2, 17) * 1.25;
+      const value = wave + noise;
+      const index = value < -0.45 ? 0 : value < 0.25 ? 1 : value < 1.05 ? 2 : 3;
+      ctx.fillStyle = background.colors[index];
+      ctx.fillRect(left + x, top + y, step, step);
+    }
+  }
+
+  ctx.fillStyle = hexToRgba(background.secondaryAccent, 0.16);
+  for (let y = -20; y < height; y += 54) {
+    ctx.beginPath();
+    ctx.moveTo(left, top + y + 10);
+    ctx.lineTo(left + width, top + y - 52);
+    ctx.lineTo(left + width, top + y - 38);
+    ctx.lineTo(left, top + y + 24);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function drawPreviewGreenGrain(ctx, background, left, top, width, height) {
+  const step = 3;
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const fine = pseudoNoise2D(x, y, 31);
+      const broad = pseudoNoise2D(Math.floor(x / 18), Math.floor(y / 18), 43);
+      const value = fine * 0.72 + broad * 0.28;
+      const index = value < 0.2 ? 0 : value < 0.52 ? 1 : value < 0.86 ? 2 : 3;
+      ctx.fillStyle = background.colors[index];
+      ctx.fillRect(left + x, top + y, step, step);
+    }
+  }
+
+  ctx.fillStyle = hexToRgba(background.secondaryAccent, 0.32);
+  for (let index = 0; index < 150; index += 1) {
+    const x = left + Math.floor(pseudoRandom(index, 211) * width / 3) * 3;
+    const y = top + Math.floor(pseudoRandom(index, 223) * height / 3) * 3;
+    ctx.fillRect(x, y, 3, 3);
+  }
+}
+
+function drawPreviewBlueCircuit(ctx, background, left, top, width, height) {
+  ctx.fillStyle = background.colors[0];
+  ctx.fillRect(left, top, width, height);
+
+  ctx.fillStyle = background.colors[1];
+  for (let y = 0; y < height; y += 4) {
+    for (let x = 0; x < width; x += 4) {
+      if (pseudoNoise2D(x, y, 59) > 0.82) {
+        ctx.fillRect(left + x, top + y, 4, 4);
+      }
+    }
+  }
+
+  const cell = 32;
+  for (let y = 0; y < height; y += cell) {
+    for (let x = 0; x < width; x += cell) {
+      drawPreviewCircuitCell(ctx, left + x, top + y, background);
+    }
+  }
+}
+
+function drawPreviewCircuitCell(ctx, x, y, background) {
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#00091e";
+  strokePreviewPath(ctx, x + 5, y + 8, [[x + 22, y + 8], [x + 22, y + 18], [x + 13, y + 18]]);
+  strokePreviewPath(ctx, x + 7, y + 26, [[x + 26, y + 26], [x + 26, y + 14]]);
+
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = background.accent;
+  strokePreviewPath(ctx, x + 4, y + 7, [[x + 21, y + 7], [x + 21, y + 17], [x + 12, y + 17]]);
+  strokePreviewPath(ctx, x + 6, y + 25, [[x + 25, y + 25], [x + 25, y + 13]]);
+  ctx.fillStyle = background.secondaryAccent;
+  ctx.fillRect(x + 10, y + 15, 5, 5);
+  ctx.fillRect(x + 23, y + 11, 4, 4);
+}
+
+function drawPreviewRedMechanic(ctx, background, left, top, width, height) {
+  const greyPalette = [background.colors[0], background.colors[1], background.colors[2]];
+  const step = 4;
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const noise = pseudoNoise2D(x, y, 97);
+      const index = noise < 0.34 ? 0 : noise < 0.72 ? 1 : 2;
+      ctx.fillStyle = greyPalette[index];
+      ctx.fillRect(left + x, top + y, step, step);
+    }
+  }
+
+  const cell = 34;
+  for (let y = 0; y < height; y += cell) {
+    for (let x = 0; x < width; x += cell) {
+      drawPreviewRedMechanicalCell(ctx, left + x, top + y, background);
+    }
+  }
+}
+
+function drawPreviewRedMechanicalCell(ctx, x, y, background) {
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#260808";
+  strokePreviewPath(ctx, x + 17, y + 3, [[x + 17, y + 31]]);
+  strokePreviewPath(ctx, x + 3, y + 17, [[x + 31, y + 17]]);
+
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = background.accent;
+  strokePreviewPath(ctx, x + 16, y + 3, [[x + 16, y + 31]]);
+  strokePreviewPath(ctx, x + 3, y + 16, [[x + 31, y + 16]]);
+  ctx.strokeRect(x + 10, y + 10, 12, 12);
+  ctx.fillStyle = background.secondaryAccent;
+  ctx.fillRect(x + 6, y + 14, 5, 5);
+  ctx.fillRect(x + 23, y + 14, 5, 5);
+  ctx.fillRect(x + 14, y + 6, 5, 5);
+  ctx.fillRect(x + 14, y + 23, 5, 5);
+}
+
+function strokePreviewPath(ctx, startX, startY, points) {
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  for (const [x, y] of points) {
+    ctx.lineTo(x, y);
+  }
+  ctx.stroke();
 }
 
 function renderJson() {
@@ -555,6 +739,28 @@ function getCellTokenFromSpriteKey(spriteKey) {
   }
 
   return "empty";
+}
+
+function pseudoRandom(index, salt) {
+  const value = Math.sin((index + 1) * 12.9898 + salt * 78.233) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function pseudoNoise2D(x, y, salt) {
+  const value = Math.sin((x + 1) * 127.1 + (y + 1) * 311.7 + salt * 74.7) * 43758.5453123;
+  return value - Math.floor(value);
+}
+
+function hexToRgba(hex, alpha) {
+  const normalized = String(hex).replace("#", "");
+  if (!/^[0-9a-f]{6}$/i.test(normalized)) {
+    return `rgba(255, 255, 255, ${alpha})`;
+  }
+
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
 function setStatus(message, isError = false) {

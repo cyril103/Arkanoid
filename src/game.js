@@ -1,5 +1,5 @@
 import { Ball, Brick, Enemy, EnemyExplosion, LaserShot, Paddle, PowerUp } from "./entities.js";
-import { ENEMY_LIBRARY, GAME_CONFIG, POWERUP_LIBRARY } from "./config.js";
+import { ENEMY_LIBRARY, GAME_CONFIG, LEVEL_BACKGROUND_LIBRARY, POWERUP_LIBRARY } from "./config.js";
 import { buildBrickPlacements, normalizeEnemyType } from "./levels.js";
 import { loadSprites } from "./sprites.js";
 import { getResolvedSpriteManifest } from "./spriteHooks.js";
@@ -60,6 +60,7 @@ export class Game {
     this.paddleWidthTransition = null;
     this.paddleLaserTransitionElapsed = 0;
     this.paddleDestruction = null;
+    this.levelBackgroundCache = new Map();
   }
 
   async init() {
@@ -993,6 +994,8 @@ export class Game {
       GAME_CONFIG.frame.height - GAME_CONFIG.frame.topThickness
     );
 
+    this.renderLevelBackground();
+
     this.ctx.save();
     this.ctx.beginPath();
     this.ctx.rect(
@@ -1104,6 +1107,193 @@ export class Game {
         GAME_CONFIG.frame.height
       );
     });
+  }
+
+  renderLevelBackground() {
+    const backgroundId = this.levels[this.levelIndex]?.background;
+    const background = LEVEL_BACKGROUND_LIBRARY[backgroundId] ?? LEVEL_BACKGROUND_LIBRARY["blue-panel"];
+    const left = GAME_CONFIG.playfield.left;
+    const top = GAME_CONFIG.playfield.top;
+    const width = GAME_CONFIG.playfield.width;
+    const height = GAME_CONFIG.frame.height - GAME_CONFIG.frame.topThickness;
+    const cacheKey = `${background.id}:${width}x${height}`;
+
+    let cached = this.levelBackgroundCache.get(cacheKey);
+    if (!cached) {
+      cached = this.createLevelBackgroundCanvas(background, width, height);
+      this.levelBackgroundCache.set(cacheKey, cached);
+    }
+
+    this.ctx.save();
+    this.ctx.imageSmoothingEnabled = false;
+    this.ctx.drawImage(cached, left, top);
+    this.ctx.restore();
+  }
+
+  createLevelBackgroundCanvas(background, width, height) {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+
+    switch (background.pattern) {
+      case "green-grain":
+        this.drawGreenGrainPanel(ctx, background, 0, 0, width, height);
+        break;
+      case "blue-circuit":
+        this.drawBlueCircuitPanel(ctx, background, 0, 0, width, height);
+        break;
+      case "red-mechanic":
+        this.drawRedMechanicPanel(ctx, background, 0, 0, width, height);
+        break;
+      case "blue-texture":
+      default:
+        this.drawBlueTexturePanel(ctx, background, 0, 0, width, height);
+        break;
+    }
+
+    return canvas;
+  }
+
+  drawBlueTexturePanel(ctx, background, left, top, width, height) {
+    const palette = background.colors;
+    const step = 4;
+    for (let y = 0; y < height; y += step) {
+      for (let x = 0; x < width; x += step) {
+        const wave = Math.sin((x + y * 1.35) * 0.075) + Math.sin((x * 0.36 - y * 0.18) * 0.11) * 0.55;
+        const noise = pseudoNoise2D(x >> 2, y >> 2, 17) * 1.25;
+        const value = wave + noise;
+        const index = value < -0.45 ? 0 : value < 0.25 ? 1 : value < 1.05 ? 2 : 3;
+        ctx.fillStyle = palette[index];
+        ctx.fillRect(left + x, top + y, step, step);
+      }
+    }
+
+    ctx.fillStyle = hexToRgba(background.secondaryAccent, 0.16);
+    for (let y = -20; y < height; y += 54) {
+      ctx.beginPath();
+      ctx.moveTo(left, top + y + 10);
+      ctx.lineTo(left + width, top + y - 52);
+      ctx.lineTo(left + width, top + y - 38);
+      ctx.lineTo(left, top + y + 24);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  drawGreenGrainPanel(ctx, background, left, top, width, height) {
+    const palette = background.colors;
+    const step = 3;
+    for (let y = 0; y < height; y += step) {
+      for (let x = 0; x < width; x += step) {
+        const fine = pseudoNoise2D(x, y, 31);
+        const broad = pseudoNoise2D(Math.floor(x / 18), Math.floor(y / 18), 43);
+        const value = fine * 0.72 + broad * 0.28;
+        const index = value < 0.2 ? 0 : value < 0.52 ? 1 : value < 0.86 ? 2 : 3;
+        ctx.fillStyle = palette[index];
+        ctx.fillRect(left + x, top + y, step, step);
+      }
+    }
+
+    ctx.fillStyle = hexToRgba(background.secondaryAccent, 0.32);
+    for (let index = 0; index < 230; index += 1) {
+      const x = left + Math.floor(pseudoRandom(index, 211) * width / 3) * 3;
+      const y = top + Math.floor(pseudoRandom(index, 223) * height / 3) * 3;
+      ctx.fillRect(x, y, 3, 3);
+    }
+  }
+
+  drawBlueCircuitPanel(ctx, background, left, top, width, height) {
+    ctx.fillStyle = background.colors[0];
+    ctx.fillRect(left, top, width, height);
+
+    ctx.fillStyle = background.colors[1];
+    for (let y = 0; y < height; y += 4) {
+      for (let x = 0; x < width; x += 4) {
+        if (pseudoNoise2D(x, y, 59) > 0.82) {
+          ctx.fillRect(left + x, top + y, 4, 4);
+        }
+      }
+    }
+
+    const cell = 32;
+    for (let y = 0; y < height; y += cell) {
+      for (let x = 0; x < width; x += cell) {
+        this.drawCircuitCell(ctx, left + x, top + y, cell, background, x, y);
+      }
+    }
+  }
+
+  drawCircuitCell(ctx, x, y, size, background, gridX, gridY) {
+    const variant = Math.floor(pseudoNoise2D(gridX, gridY, 71) * 4);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#00091e";
+    this.strokeOrthogonalPath(ctx, x + 5, y + 8, [[x + 22, y + 8], [x + 22, y + 18], [x + 13, y + 18]]);
+    this.strokeOrthogonalPath(ctx, x + 7, y + 26, [[x + 26, y + 26], [x + 26, y + 14]]);
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = background.accent;
+    this.strokeOrthogonalPath(ctx, x + 4, y + 7, [[x + 21, y + 7], [x + 21, y + 17], [x + 12, y + 17]]);
+    this.strokeOrthogonalPath(ctx, x + 6, y + 25, [[x + 25, y + 25], [x + 25, y + 13]]);
+
+    ctx.fillStyle = background.secondaryAccent;
+    ctx.fillRect(x + 10, y + 15, 5, 5);
+    ctx.fillRect(x + 23, y + 11, 4, 4);
+    if (variant % 2 === 0) {
+      ctx.fillRect(x + 4, y + 4, 5, 5);
+    } else {
+      ctx.strokeRect(x + 16, y + 3, 10, 10);
+    }
+  }
+
+  drawRedMechanicPanel(ctx, background, left, top, width, height) {
+    const greyPalette = [background.colors[0], background.colors[1], background.colors[2]];
+    const step = 4;
+    for (let y = 0; y < height; y += step) {
+      for (let x = 0; x < width; x += step) {
+        const noise = pseudoNoise2D(x, y, 97);
+        const index = noise < 0.34 ? 0 : noise < 0.72 ? 1 : 2;
+        ctx.fillStyle = greyPalette[index];
+        ctx.fillRect(left + x, top + y, step, step);
+      }
+    }
+
+    const cell = 34;
+    for (let y = 0; y < height; y += cell) {
+      for (let x = 0; x < width; x += cell) {
+        this.drawRedMechanicalCell(ctx, left + x, top + y, cell, background);
+      }
+    }
+  }
+
+  drawRedMechanicalCell(ctx, x, y, size, background) {
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#260808";
+    this.strokeOrthogonalPath(ctx, x + 17, y + 3, [[x + 17, y + 31]]);
+    this.strokeOrthogonalPath(ctx, x + 3, y + 17, [[x + 31, y + 17]]);
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = background.accent;
+    this.strokeOrthogonalPath(ctx, x + 16, y + 3, [[x + 16, y + 31]]);
+    this.strokeOrthogonalPath(ctx, x + 3, y + 16, [[x + 31, y + 16]]);
+    ctx.strokeRect(x + 10, y + 10, 12, 12);
+
+    ctx.fillStyle = background.secondaryAccent;
+    ctx.fillRect(x + 6, y + 14, 5, 5);
+    ctx.fillRect(x + 23, y + 14, 5, 5);
+    ctx.fillRect(x + 14, y + 6, 5, 5);
+    ctx.fillRect(x + 14, y + 23, 5, 5);
+  }
+
+
+  strokeOrthogonalPath(ctx, startX, startY, points) {
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    for (const [x, y] of points) {
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
   }
 
   renderPaddle() {
@@ -1478,6 +1668,32 @@ function getAnimationDuration(sprite) {
   }
 
   return sprite.frameImages.length / (sprite.fps ?? 8);
+}
+
+function pseudoRandom(index, salt) {
+  const value = Math.sin((index + 1) * 12.9898 + salt * 78.233) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function pseudoNoise2D(x, y, salt) {
+  const value = Math.sin((x + 1) * 127.1 + (y + 1) * 311.7 + salt * 74.7) * 43758.5453123;
+  return value - Math.floor(value);
+}
+
+function bottomEdge(top, height) {
+  return top + height;
+}
+
+function hexToRgba(hex, alpha) {
+  const normalized = String(hex).replace("#", "");
+  if (!/^[0-9a-f]{6}$/i.test(normalized)) {
+    return `rgba(255, 255, 255, ${alpha})`;
+  }
+
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
 function drawSprite(ctx, sprite, bounds, fallback = () => {}, elapsed = 0, loop = true) {

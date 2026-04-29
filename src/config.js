@@ -94,6 +94,9 @@ export const GAME_CONFIG = Object.freeze({
   warp: {
     transitionDuration: 0.55,
     doorFps: 14
+  },
+  performance: {
+    reducedFps: 45
   }
 });
 

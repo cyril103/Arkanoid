@@ -14,6 +14,9 @@ async function bootstrap() {
   const highScoreNode = document.getElementById("high-score-value");
   const sounds = createSoundboard(getResolvedSoundManifest());
   const levels = await loadLevels();
+  const reducedPerformanceMode = detectReducedPerformanceMode();
+
+  document.body.classList.toggle("reduced-performance", reducedPerformanceMode);
 
   canvas.width = GAME_CONFIG.canvasWidth;
   canvas.height = GAME_CONFIG.canvasHeight;
@@ -23,7 +26,8 @@ async function bootstrap() {
     scoreNode,
     highScoreNode,
     sounds,
-    levels
+    levels,
+    reducedPerformanceMode
   });
 
   sounds.installUnlockHandlers();
@@ -34,8 +38,14 @@ async function bootstrap() {
   canvas.focus();
 
   let previousTime = performance.now();
+  const minFrameMs = reducedPerformanceMode ? 1000 / GAME_CONFIG.performance.reducedFps : 0;
 
   const frame = (timestamp) => {
+    if (minFrameMs > 0 && timestamp - previousTime < minFrameMs) {
+      window.requestAnimationFrame(frame);
+      return;
+    }
+
     const dt = Math.min((timestamp - previousTime) / 1000, 1 / 30);
     previousTime = timestamp;
 
@@ -54,6 +64,25 @@ async function bootstrap() {
   };
 
   window.requestAnimationFrame(frame);
+}
+
+function detectReducedPerformanceMode() {
+  const forcedMode = new URLSearchParams(window.location.search).get("performance");
+  if (forcedMode === "reduced") {
+    return true;
+  }
+  if (forcedMode === "full") {
+    return false;
+  }
+
+  const userAgent = window.navigator?.userAgent ?? "";
+  const platform = window.navigator?.platform ?? "";
+  const hasTouch = window.navigator?.maxTouchPoints > 1;
+  const isIOS = /iPad|iPhone|iPod/.test(userAgent) || (platform === "MacIntel" && hasTouch);
+  const isSafari = /Safari/.test(userAgent) && !/Chrome|Chromium|CriOS|FxiOS|Edg\//.test(userAgent);
+  const isMacOS = /Mac/.test(platform) && isSafari;
+
+  return isIOS || isMacOS;
 }
 
 function waitForStartMenu({ startMenu, startButton }) {

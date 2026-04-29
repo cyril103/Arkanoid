@@ -17,10 +17,11 @@ export class Game {
     livesNode = null,
     effectNode = null,
     sounds = null,
-    levels = []
+    levels = [],
+    reducedPerformanceMode = false
   }) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
+    this.ctx = canvas.getContext("2d", { alpha: false });
     this.scoreNode = scoreNode;
     this.highScoreNode = highScoreNode;
     this.levelNode = levelNode;
@@ -29,6 +30,7 @@ export class Game {
     this.effectNode = effectNode;
     this.sounds = sounds;
     this.levels = levels;
+    this.reducedPerformanceMode = reducedPerformanceMode;
 
     this.paddle = new Paddle();
     this.balls = [new Ball()];
@@ -61,6 +63,8 @@ export class Game {
     this.paddleLaserTransitionElapsed = 0;
     this.paddleDestruction = null;
     this.levelBackgroundCache = new Map();
+    this.staticBackdropCache = null;
+    this.staticBackdropCacheKey = null;
   }
 
   async init() {
@@ -979,78 +983,11 @@ export class Game {
   }
 
   renderBackdrop() {
-    const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
-    gradient.addColorStop(0, "#05090f");
-    gradient.addColorStop(1, "#02040b");
+    this.renderStaticBackdrop();
 
-    this.ctx.fillStyle = gradient;
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-    this.ctx.fillStyle = "#010306";
-    this.ctx.fillRect(
-      GAME_CONFIG.playfield.left,
-      GAME_CONFIG.playfield.top,
-      GAME_CONFIG.playfield.width,
-      GAME_CONFIG.frame.height - GAME_CONFIG.frame.topThickness
-    );
-
-    this.renderLevelBackground();
-
-    this.ctx.save();
-    this.ctx.beginPath();
-    this.ctx.rect(
-      GAME_CONFIG.playfield.left,
-      GAME_CONFIG.playfield.top,
-      GAME_CONFIG.playfield.width,
-      GAME_CONFIG.frame.height - GAME_CONFIG.frame.topThickness
-    );
-    this.ctx.clip();
-
-    this.ctx.strokeStyle = "rgba(113, 162, 255, 0.08)";
-    this.ctx.lineWidth = 1;
-
-    for (let x = GAME_CONFIG.playfield.left; x < GAME_CONFIG.playfield.right; x += 32) {
-      this.ctx.beginPath();
-      this.ctx.moveTo(x, GAME_CONFIG.playfield.top);
-      this.ctx.lineTo(x, GAME_CONFIG.frame.y + GAME_CONFIG.frame.height);
-      this.ctx.stroke();
+    if (!this.shouldDrawDecorativeOverlays()) {
+      return;
     }
-
-    for (let y = GAME_CONFIG.playfield.top; y < GAME_CONFIG.frame.y + GAME_CONFIG.frame.height; y += 32) {
-      this.ctx.beginPath();
-      this.ctx.moveTo(GAME_CONFIG.playfield.left, y);
-      this.ctx.lineTo(GAME_CONFIG.playfield.right, y);
-      this.ctx.stroke();
-    }
-
-    this.ctx.restore();
-
-    if (this.sprites?.logo) {
-      this.ctx.save();
-      this.ctx.globalAlpha = 0.18;
-      drawSprite(this.ctx, this.sprites.logo, {
-        x: (this.canvas.width / 2) - 140,
-        y: 24,
-        width: 280,
-        height: 102
-      });
-      this.ctx.restore();
-    }
-
-    drawSprite(this.ctx, this.sprites.frameTop, {
-      x: GAME_CONFIG.playfield.left,
-      y: GAME_CONFIG.frame.y,
-      width: GAME_CONFIG.playfield.width,
-      height: GAME_CONFIG.frame.topThickness
-    }, () => {
-      this.ctx.fillStyle = "#b6bcc7";
-      this.ctx.fillRect(
-        GAME_CONFIG.playfield.left,
-        GAME_CONFIG.frame.y,
-        GAME_CONFIG.playfield.width,
-        GAME_CONFIG.frame.topThickness
-      );
-    });
 
     if (this.pendingTransitionReason === "warp") {
       const warpElapsed = GAME_CONFIG.warp.transitionDuration - this.levelCompleteCooldown;
@@ -1109,7 +1046,151 @@ export class Game {
     });
   }
 
-  renderLevelBackground() {
+  shouldDrawDecorativeOverlays() {
+    if (this.reducedPerformanceMode) {
+      return false;
+    }
+    return true;
+  }
+
+  renderStaticBackdrop() {
+    const backgroundId = this.levels[this.levelIndex]?.background ?? "blue-panel";
+    const cacheKey = `${backgroundId}:${this.canvas.width}x${this.canvas.height}:reduced=${this.reducedPerformanceMode}`;
+
+    if (!this.staticBackdropCache || this.staticBackdropCacheKey !== cacheKey) {
+      const canvas = document.createElement("canvas");
+      canvas.width = this.canvas.width;
+      canvas.height = this.canvas.height;
+      const ctx = canvas.getContext("2d", { alpha: false });
+      this.drawStaticBackdrop(ctx);
+      this.staticBackdropCache = canvas;
+      this.staticBackdropCacheKey = cacheKey;
+    }
+
+    this.ctx.drawImage(this.staticBackdropCache, 0, 0);
+  }
+
+  drawStaticBackdrop(ctx) {
+    const gradient = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+    gradient.addColorStop(0, "#05090f");
+    gradient.addColorStop(1, "#02040b");
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    ctx.fillStyle = "#010306";
+    ctx.fillRect(
+      GAME_CONFIG.playfield.left,
+      GAME_CONFIG.playfield.top,
+      GAME_CONFIG.playfield.width,
+      GAME_CONFIG.frame.height - GAME_CONFIG.frame.topThickness
+    );
+
+    this.renderLevelBackground(ctx);
+
+    if (this.shouldDrawDecorativeOverlays()) {
+      this.drawPlayfieldGrid(ctx);
+      this.drawBackdropLogo(ctx);
+    }
+
+    this.drawFrameSprites(ctx);
+  }
+
+  drawPlayfieldGrid(ctx) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(
+      GAME_CONFIG.playfield.left,
+      GAME_CONFIG.playfield.top,
+      GAME_CONFIG.playfield.width,
+      GAME_CONFIG.frame.height - GAME_CONFIG.frame.topThickness
+    );
+    ctx.clip();
+
+    ctx.strokeStyle = "rgba(113, 162, 255, 0.08)";
+    ctx.lineWidth = 1;
+
+    for (let x = GAME_CONFIG.playfield.left; x < GAME_CONFIG.playfield.right; x += 32) {
+      ctx.beginPath();
+      ctx.moveTo(x, GAME_CONFIG.playfield.top);
+      ctx.lineTo(x, GAME_CONFIG.frame.y + GAME_CONFIG.frame.height);
+      ctx.stroke();
+    }
+
+    for (let y = GAME_CONFIG.playfield.top; y < GAME_CONFIG.frame.y + GAME_CONFIG.frame.height; y += 32) {
+      ctx.beginPath();
+      ctx.moveTo(GAME_CONFIG.playfield.left, y);
+      ctx.lineTo(GAME_CONFIG.playfield.right, y);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  drawBackdropLogo(ctx) {
+    if (!this.sprites?.logo) {
+      return;
+    }
+
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    drawSprite(ctx, this.sprites.logo, {
+      x: (this.canvas.width / 2) - 140,
+      y: 24,
+      width: 280,
+      height: 102
+    });
+    ctx.restore();
+  }
+
+  drawFrameSprites(ctx) {
+    drawSprite(ctx, this.sprites.frameTop, {
+      x: GAME_CONFIG.playfield.left,
+      y: GAME_CONFIG.frame.y,
+      width: GAME_CONFIG.playfield.width,
+      height: GAME_CONFIG.frame.topThickness
+    }, () => {
+      ctx.fillStyle = "#b6bcc7";
+      ctx.fillRect(
+        GAME_CONFIG.playfield.left,
+        GAME_CONFIG.frame.y,
+        GAME_CONFIG.playfield.width,
+        GAME_CONFIG.frame.topThickness
+      );
+    });
+
+    drawSprite(ctx, this.sprites.frameLeft, {
+      x: GAME_CONFIG.frame.x,
+      y: GAME_CONFIG.frame.y,
+      width: GAME_CONFIG.frame.wallThickness,
+      height: GAME_CONFIG.frame.height
+    }, () => {
+      ctx.fillStyle = "#a6afbb";
+      ctx.fillRect(
+        GAME_CONFIG.frame.x,
+        GAME_CONFIG.frame.y,
+        GAME_CONFIG.frame.wallThickness,
+        GAME_CONFIG.frame.height
+      );
+    });
+
+    drawSprite(ctx, this.sprites.frameRight, {
+      x: GAME_CONFIG.frame.x + GAME_CONFIG.frame.width - GAME_CONFIG.frame.wallThickness,
+      y: GAME_CONFIG.frame.y,
+      width: GAME_CONFIG.frame.wallThickness,
+      height: GAME_CONFIG.frame.height
+    }, () => {
+      ctx.fillStyle = "#a6afbb";
+      ctx.fillRect(
+        GAME_CONFIG.frame.x + GAME_CONFIG.frame.width - GAME_CONFIG.frame.wallThickness,
+        GAME_CONFIG.frame.y,
+        GAME_CONFIG.frame.wallThickness,
+        GAME_CONFIG.frame.height
+      );
+    });
+  }
+
+  renderLevelBackground(ctx = this.ctx) {
     const backgroundId = this.levels[this.levelIndex]?.background;
     const background = LEVEL_BACKGROUND_LIBRARY[backgroundId] ?? LEVEL_BACKGROUND_LIBRARY["blue-panel"];
     const left = GAME_CONFIG.playfield.left;
@@ -1124,10 +1205,10 @@ export class Game {
       this.levelBackgroundCache.set(cacheKey, cached);
     }
 
-    this.ctx.save();
-    this.ctx.imageSmoothingEnabled = false;
-    this.ctx.drawImage(cached, left, top);
-    this.ctx.restore();
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(cached, left, top);
+    ctx.restore();
   }
 
   createLevelBackgroundCanvas(background, width, height) {

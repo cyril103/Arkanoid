@@ -96,7 +96,7 @@ export const GAME_CONFIG = Object.freeze({
     doorFps: 14
   },
   performance: {
-    reducedFps: 45
+    reducedFps: 30
   }
 });
 

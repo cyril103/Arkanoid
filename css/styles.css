@@ -188,10 +188,16 @@ body::before {
   box-shadow: 0 0 22px rgba(47, 243, 255, 0.18);
 }
 
+body.reduced-performance {
+  background: #05060a;
+}
+
 body.reduced-performance::before {
   display: none;
 }
 
+body.reduced-performance .start-menu,
+body.reduced-performance .start-menu__panel,
 body.reduced-performance .arcade-stage,
 body.reduced-performance .game-frame,
 body.reduced-performance #game-canvas,

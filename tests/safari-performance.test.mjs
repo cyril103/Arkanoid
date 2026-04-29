@@ -48,6 +48,21 @@ assert.match(
 );
 assert.match(
   game,
+  /brickLayerCache/,
+  'reduced performance mode should cache the mostly-static brick layer instead of drawing every brick sprite every frame'
+);
+assert.match(
+  game,
+  /invalidateBrickLayerCache/,
+  'brick cache should be invalidated only when bricks change or hit animations advance'
+);
+assert.match(
+  game,
+  /setTextIfChanged/,
+  'HUD updates should avoid rewriting DOM text every animation frame on Safari/iOS'
+);
+assert.match(
+  game,
   /if \(this\.reducedPerformanceMode\)/,
   'rendering should have an explicit reduced performance path for WebKit/iOS devices'
 );

@@ -65,6 +65,8 @@ export class Game {
     this.levelBackgroundCache = new Map();
     this.staticBackdropCache = null;
     this.staticBackdropCacheKey = null;
+    this.brickLayerCache = null;
+    this.brickLayerCacheDirty = true;
   }
 
   async init() {
@@ -93,6 +95,7 @@ export class Game {
     this.pendingLevelIndex = null;
     this.pendingTransitionReason = null;
     this.paddleDestruction = null;
+    this.invalidateBrickLayerCache();
     this.updateHud();
   }
 
@@ -345,12 +348,25 @@ export class Game {
   }
 
   updateBrickAnimations(dt) {
+    let needsBrickLayerRefresh = false;
+
     for (const brick of this.bricks) {
-      if (brick.destroyed) {
+      if (brick.destroyed || !brick.hitAnimationActive) {
         continue;
       }
 
+      const wasActive = brick.hitAnimationActive;
+      const previousFrame = Math.floor(brick.hitAnimationElapsed * GAME_CONFIG.bricks.hardHitAnimationFps);
       brick.update(dt);
+      const nextFrame = Math.floor(brick.hitAnimationElapsed * GAME_CONFIG.bricks.hardHitAnimationFps);
+
+      if (wasActive !== brick.hitAnimationActive || previousFrame !== nextFrame) {
+        needsBrickLayerRefresh = true;
+      }
+    }
+
+    if (needsBrickLayerRefresh) {
+      this.invalidateBrickLayerCache();
     }
   }
 
@@ -897,6 +913,7 @@ export class Game {
   damageBrick(brick) {
     const points = brick.hit();
     const wasDestroyed = brick.destroyed;
+    this.invalidateBrickLayerCache();
     this.score += points;
     if (wasDestroyed) {
       this.maybeSpawnPowerUp(brick);
@@ -935,33 +952,33 @@ export class Game {
     }
 
     if (this.scoreNode) {
-      this.scoreNode.textContent = formatHudScore(this.score);
+      setTextIfChanged(this.scoreNode, formatHudScore(this.score));
     }
 
     if (this.highScoreNode) {
-      this.highScoreNode.textContent = formatHudScore(this.highScore);
+      setTextIfChanged(this.highScoreNode, formatHudScore(this.highScore));
     }
 
     if (this.levelNode) {
-      this.levelNode.textContent = `${this.levelIndex + 1} - ${this.levels[this.levelIndex].name}`;
+      setTextIfChanged(this.levelNode, `${this.levelIndex + 1} - ${this.levels[this.levelIndex].name}`);
     }
 
     if (this.statusNode) {
-      this.statusNode.textContent = this.statusText;
+      setTextIfChanged(this.statusNode, this.statusText);
     }
 
     if (this.livesNode) {
-      this.livesNode.textContent = String(this.lives);
+      setTextIfChanged(this.livesNode, String(this.lives));
     }
 
     if (this.effectNode) {
-      this.effectNode.textContent = this.getActiveEffectText();
+      setTextIfChanged(this.effectNode, this.getActiveEffectText());
     }
   }
 
   updateEffectHud() {
     if (this.effectNode) {
-      this.effectNode.textContent = this.getActiveEffectText();
+      setTextIfChanged(this.effectNode, this.getActiveEffectText());
     }
   }
 
@@ -1403,6 +1420,33 @@ export class Game {
   }
 
   renderBricks() {
+    if (this.reducedPerformanceMode) {
+      this.renderCachedBrickLayer();
+      return;
+    }
+
+    this.drawBricksToContext(this.ctx);
+  }
+
+  renderCachedBrickLayer() {
+    if (!this.brickLayerCache) {
+      this.brickLayerCache = document.createElement("canvas");
+      this.brickLayerCache.width = this.canvas.width;
+      this.brickLayerCache.height = this.canvas.height;
+      this.brickLayerCacheDirty = true;
+    }
+
+    if (this.brickLayerCacheDirty) {
+      const ctx = this.brickLayerCache.getContext("2d", { alpha: true });
+      ctx.clearRect(0, 0, this.brickLayerCache.width, this.brickLayerCache.height);
+      this.drawBricksToContext(ctx);
+      this.brickLayerCacheDirty = false;
+    }
+
+    this.ctx.drawImage(this.brickLayerCache, 0, 0);
+  }
+
+  drawBricksToContext(ctx) {
     for (const brick of this.bricks) {
       if (brick.destroyed) {
         continue;
@@ -1412,11 +1456,15 @@ export class Game {
         ? this.sprites.brickSilverHit
         : this.sprites[getBrickSpriteKey(brick)];
 
-      drawSprite(this.ctx, sprite, brick, () => {
-        this.ctx.fillStyle = brick.indestructible ? "#e0b84a" : brick.type === "hard" ? "#c8d1de" : "#9cf27a";
-        this.ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+      drawSprite(ctx, sprite, brick, () => {
+        ctx.fillStyle = brick.indestructible ? "#e0b84a" : brick.type === "hard" ? "#c8d1de" : "#9cf27a";
+        ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
       }, brick.hitAnimationElapsed, false);
     }
+  }
+
+  invalidateBrickLayerCache() {
+    this.brickLayerCacheDirty = true;
   }
 
   renderEnemies() {
@@ -1582,6 +1630,13 @@ function buildBricks(layout) {
 
 function formatHudScore(score) {
   return String(Math.max(0, Math.trunc(score))).padStart(6, "0");
+}
+
+function setTextIfChanged(node, text) {
+  const nextText = String(text);
+  if (node.textContent !== nextText) {
+    node.textContent = nextText;
+  }
 }
 
 function loadHighScore() {

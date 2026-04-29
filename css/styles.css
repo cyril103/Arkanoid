@@ -188,6 +188,30 @@ body::before {
   box-shadow: 0 0 22px rgba(47, 243, 255, 0.18);
 }
 
+body.reduced-performance::before {
+  display: none;
+}
+
+body.reduced-performance .arcade-stage,
+body.reduced-performance .game-frame,
+body.reduced-performance #game-canvas,
+body.reduced-performance .hud,
+body.reduced-performance .help,
+body.reduced-performance .mobile-controls__button {
+  box-shadow: none;
+}
+
+body.reduced-performance .hud::before {
+  opacity: 0.18;
+}
+
+body.reduced-performance .hud__label,
+body.reduced-performance .hud strong,
+body.reduced-performance .start-menu__eyebrow,
+body.reduced-performance .start-menu h1 {
+  text-shadow: none;
+}
+
 .mobile-controls {
   display: none;
   grid-template-columns: 1fr minmax(124px, 1.25fr) 1fr;
